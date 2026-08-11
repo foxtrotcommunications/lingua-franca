@@ -87,6 +87,31 @@ function addressedCharacter(scene: Scene, characterId?: string): SceneCharacter 
   return scene.characters.find((c) => c.entersWhen === 'start') ?? scene.characters[0]!;
 }
 
+/**
+ * How the character relates to the learner's task list, by difficulty. At easy
+ * tiers the character is a PARTNER: they steer toward open tasks and hint
+ * diegetically (asking the question that invites the missing information is
+ * the hint). At the top tiers the learner drives, and the character's
+ * willingness to comply mirrors the Coach's grading bar so the fiction doesn't
+ * grant what the ledger refuses.
+ */
+function taskStance(level: number, lang: string): string {
+  if (level <= 2) {
+    return `Actively HELP the learner along: steer the conversation toward their open tasks,
+one at a time, with natural in-character prompts (e.g. if they must state a purpose, ask
+them what it is). If they seem stuck or ask for help, give a hint — in ${lang}, in
+character, as a real person would. Be forgiving and encouraging.`;
+  }
+  if (level === 3) {
+    return `You may prompt naturally for their open tasks, but let the learner do the
+talking — nudge, don't hand-hold.`;
+  }
+  return `Do NOT steer, hint, or prompt for their tasks — the learner must drive the
+conversation. And at this level, if their ${lang} is genuinely broken or unnatural for
+this setting, react as a real native would: ask them to repeat or say it more clearly (a
+repair) rather than fully granting the request. Comply only with well-formed requests.`;
+}
+
 async function generateReply(
   scene: Scene,
   character: SceneCharacter,
@@ -94,11 +119,13 @@ async function generateReply(
   calibration: { known: string[]; avoid: string[] },
   history: TurnRequest['history'],
   lang: string,
+  taskState: { credited: string[]; open: string[] },
 ): Promise<string> {
   const hist = (history ?? [])
     .slice(-8)
     .map((h) => `${h.role === 'learner' ? 'Learner' : character.name}: ${h.text}`)
     .join('\n');
+  const level = difficultyOf(scene.difficulty).level;
   const prompt = `You are ${character.name}. ${character.persona}
 You are in this scene: ${scene.location}.
 You know ONLY these things: ${character.knows.join('; ')}. If asked about anything
@@ -107,10 +134,11 @@ Reply ONLY in ${lang}, in character, in 1-3 short sentences, at or below level $
 Judge the learner's message by whether it WORKS (achieves the goal), never by grammar.
 Broken-but-understandable succeeds — react to their intent. If you truly can't tell what
 they mean, ask ONE short clarifying question in ${lang} (a repair), never "incorrect", never English.
-The learner is here to accomplish: "${scene.objective.description}". Respond to what they
-actually say, but do NOT do their task for them — never volunteer a recommendation, a
-suggestion, or information they are meant to ask for themselves. Let the learner initiate;
-only once they ask should you give it. Stay warm and in character — just let them lead.
+The learner is here to accomplish: "${scene.objective.description}".
+${taskState.credited.length ? `Already handled — do NOT ask about these again: ${taskState.credited.join('; ')}.` : ''}
+${taskState.open.length ? `Still open with YOU (the learner must say these to you): ${taskState.open.join('; ')}.` : ''}
+${taskStance(level, lang)}
+Stay warm and in character.
 YOU DO NOT SPEAK ENGLISH. If the learner writes in English (or any language that is not
 ${lang}), you cannot understand them: react in character as a real ${lang} speaker would —
 politely signal you didn't understand and invite them to try in ${lang} ("Perdone, no le
@@ -180,6 +208,13 @@ Return ONE JSON object (no prose):
 Judge by communicative adequacy: broken grammar with clear meaning is meaningUnderstood:true
 with a lower grammar score, NOT a failure.
 
+CONTEXT COUNTS — judge the latest message the way a real interlocutor would, in the flow
+of the conversation, not as an isolated sentence. A minimal reply that directly answers
+the character's question or request, and would accomplish the act in the real world
+(e.g. "le voici" while being asked for a passport, or "vacances" when asked why they're
+here), CONVEYS the corresponding required fact — credit it, subject to the grading bar
+above. The simulation goal is a conversation that would pass in the real world.
+
 LANGUAGE GATE — apply this FIRST, before anything else. The learner is practicing ${lang}.
 If the latest message is written in English or any language other than ${lang}, it earns NO
 credit no matter how clear the intent was: set "meaningUnderstood": false, "repairNeeded":
@@ -205,19 +240,37 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   const state0 = hydrateLedger(req, lang);
   const calibration = ledger.preConsult(state0, req.scene.objective);
 
+  // The client sends the facts banked so far; only canonical required-fact ids
+  // are accepted back from it. Built before the model calls so the character
+  // can see the task state.
+  const reqList = req.scene.objective.requiredFacts;
+  const soFar = new Set<string>((req.factsSoFar ?? []).filter((f) => reqList.includes(f)));
+  const owners = req.scene.objective.factOwners ?? [];
+
+  // What the addressed character is told about the task list: which tasks are
+  // already banked (don't re-ask) and which open ones belong to THEM (steer
+  // toward these at easy tiers). Human checklist labels, not machine ids.
+  const labelOf = (i: number) => req.scene.objective.checklist?.[i] ?? reqList[i]!;
+  const credited: string[] = [];
+  const open: string[] = [];
+  reqList.forEach((f, i) => {
+    if (soFar.has(f)) credited.push(labelOf(i));
+    else if (!owners[i] || owners[i] === character.characterId) open.push(labelOf(i));
+  });
+
   // Character reply and Coach verdict are independent — run them together.
   const [reply, raw] = await Promise.all([
-    generateReply(req.scene, character, req.utterance, calibration, req.history, lang),
+    generateReply(req.scene, character, req.utterance, calibration, req.history, lang, {
+      credited,
+      open,
+    }),
     evaluate(req.scene, req.utterance, req.history, lang, character),
   ]);
 
   // Accumulate the union of communicated facts across the conversation. The
   // Coach's labels won't always string-match the required-fact ids exactly
   // (it may return "time" for "time:morning"), so match tolerantly and store
-  // the canonical required-fact id. The client sends the facts banked so far;
-  // only canonical required-fact ids are accepted back from it.
-  const reqList = req.scene.objective.requiredFacts;
-  const soFar = new Set<string>((req.factsSoFar ?? []).filter((f) => reqList.includes(f)));
+  // the canonical required-fact id.
   const norm = (s: string) => s.toLowerCase().trim();
   // Wrong-language gate, enforced in code rather than trusted to the model: a
   // message written in the learner's own language earns no new credit, however
@@ -226,7 +279,6 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   // Ownership: in a multi-character scene each fact belongs to one character,
   // and only that character can be told/asked it. Enforced here rather than
   // trusted to the model — working out who holds what IS the puzzle.
-  const owners = req.scene.objective.factOwners ?? [];
   const soloCast = req.scene.characters.length <= 1;
   const ownerOf = (factId: string): string => {
     const i = reqList.indexOf(factId);

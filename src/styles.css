@@ -195,5 +195,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .cc-coach-note { color: var(--ink); line-height: 1.65; margin: 0; }
 .cc-coach-note.pending { color: var(--muted); display: flex; align-items: center; gap: 8px; }
 .completion-card .primary { align-self: center; margin: 0 auto; }
+.cc-actions { display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.review-return { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); z-index: 6; box-shadow: 0 10px 30px rgba(0,0,0,0.45); animation: fadeIn 0.25s ease; }
 
 @media (max-width: 860px) { .builder { grid-template-columns: 1fr; } .builder-preview { display: none; } }

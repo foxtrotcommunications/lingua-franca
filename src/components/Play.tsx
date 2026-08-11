@@ -95,6 +95,9 @@ export function Play({
     }>
   >([]);
   const [done, setDone] = useState<TurnResponse | null>(null);
+  // Completion card ↔ conversation toggle: the learner can flip back to reread
+  // the dialogue behind the results, then return to the card.
+  const [reviewing, setReviewing] = useState(false);
   const [coachNote, setCoachNote] = useState<{ right: string; improve: string } | null>(null);
   const [coachFailed, setCoachFailed] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -304,7 +307,13 @@ export function Play({
         </div>
       </div>
 
-      {done && (
+      {done && reviewing && (
+        <button className="primary review-return" onClick={() => setReviewing(false)}>
+          ✓ Back to your results
+        </button>
+      )}
+
+      {done && !reviewing && (
         <div className="completion">
           <div className="completion-card">
             <div className="cc-badge">✓ {scene.completeLabel ?? 'Mission complete!'}</div>
@@ -428,9 +437,14 @@ export function Play({
                 )}
               </div>
             )}
-            <button className="primary" onClick={onExit}>
-              Build another scene →
-            </button>
+            <div className="cc-actions">
+              <button className="ghost" onClick={() => setReviewing(true)}>
+                ↩ Review the conversation
+              </button>
+              <button className="primary" onClick={onExit}>
+                Build another scene →
+              </button>
+            </div>
           </div>
         </div>
       )}

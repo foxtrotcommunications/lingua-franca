@@ -108,11 +108,13 @@ export async function generateScenario(description: string, difficulty = 2): Pro
               `${SCHEMA_INSTRUCTIONS}\n\n` +
               `Difficulty: ${spec.label} (${spec.cefr}). ${spec.genGuidance}\n\n` +
               (spec.level >= 4
-                ? `LANGUAGE OF TASKS — OVERRIDE for this difficulty: the player reads their ` +
-                  `tasks in the language they are practicing. Write "objective.description" ` +
-                  `and EVERY requiredFact "label" in the TARGET language, not English — ` +
-                  `natural, idiomatic task phrasing at the scene's level. Machine "id"s stay ` +
-                  `kebab-case ASCII. The "briefing" stays in English.\n\n`
+                ? `LANGUAGE — OVERRIDE for this difficulty: at this level the player reads ` +
+                  `the whole scene in the language they are practicing. Write ` +
+                  `"objective.description", EVERY requiredFact "label", AND the "briefing" ` +
+                  `in the TARGET language, not English — natural and idiomatic at the ` +
+                  `scene's level. Also add a "nudge" field: ONE short sentence in the TARGET ` +
+                  `language telling the player that accuracy and natural phrasing count ` +
+                  `here. Machine "id"s stay kebab-case ASCII.\n\n`
                 : '') +
               `Variety seed: ${varietySeed} — use it to pick fresh names and personas you ` +
               `would not usually default to.\n\n` +

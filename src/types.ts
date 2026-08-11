@@ -21,6 +21,8 @@ export interface Scene {
   banner: string;
   language: string;
   briefing?: string;
+  /** Target-language level nudge (tiers 4-5); absent at 1-3. */
+  nudge?: string;
   completeLabel?: string;
   difficulty: number;
   objective: Objective;

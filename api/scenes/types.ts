@@ -43,8 +43,18 @@ export interface Scene {
   banner: string;
   /** Human language name the characters speak, e.g. "Spanish", "Italian". */
   language: string;
-  /** 2-3 sentence second-person orientation shown as the scene opens. */
+  /**
+   * 2-3 sentence second-person orientation shown as the scene opens. English
+   * at tiers 1-3; written in the target language at tiers 4-5, where the whole
+   * scene surface is comprehensible input.
+   */
   briefing?: string;
+  /**
+   * Target-language one-liner about the level's accuracy expectations, shown
+   * beside the active character's name. Generated at tiers 4-5 only; tiers 1-3
+   * fall back to the client's English nudge.
+   */
+  nudge?: string;
   /** "Mission complete!" in the target language, for the completion card. */
   completeLabel?: string;
   /** Difficulty tier 1-5 (drives cast size + grading strictness). */

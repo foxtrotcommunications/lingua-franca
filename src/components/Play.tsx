@@ -49,6 +49,9 @@ const tierOf = (d: number) => TIER[d] ?? TIER[2]!;
  * The opening nudge has to match the grading bar. At tiers 1-3 errors are
  * forgiven and "just make yourself understood" is the whole point; at 4-5 the
  * Coach demands accuracy, so promising the opposite would be a lie.
+ *
+ * At tiers 4-5 the scene carries its own target-language nudge and this is only
+ * the fallback for a generation that omitted it.
  */
 function nudgeFor(difficulty: number, language: string): string {
   if (difficulty >= 5) {
@@ -253,7 +256,17 @@ export function Play({
             <div className="hint">
               {scene.briefing && <p className="briefing">{scene.briefing}</p>}
               <p className="hint-nudge">
-                You’re talking to <b>{active.name}</b>. {nudgeFor(scene.difficulty, scene.language)}
+                {scene.nudge ? (
+                  // Tiers 4-5: the scene's own line, in the target language.
+                  <>
+                    <b>{active.name}</b> · {scene.nudge}
+                  </>
+                ) : (
+                  <>
+                    You’re talking to <b>{active.name}</b>.{' '}
+                    {nudgeFor(scene.difficulty, scene.language)}
+                  </>
+                )}
               </p>
             </div>
           )}

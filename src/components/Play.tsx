@@ -104,6 +104,7 @@ export function Play({
   const [reviewing, setReviewing] = useState(false);
   const [coachNote, setCoachNote] = useState<{ right: string; improve: string } | null>(null);
   const [coachFailed, setCoachFailed] = useState(false);
+  const [confirmReplay, setConfirmReplay] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Cross-scene learning state (vocab/grammar mastery, CEFR) — persists per
@@ -122,6 +123,26 @@ export function Play({
     scene.characters.find((c) => c.characterId === activeId) ?? scene.characters[0]!;
   // Characters that enter after the objective stay locked (dimmed) until then.
   const isLocked = (c: SceneCharacter) => c.entersWhen === 'after_objective' && !done;
+
+  /**
+   * Replay this same scene from the top. Run state clears; the ledger does not
+   * — what the learner picked up carries over, which is the point of a second
+   * attempt. Purely client-side: the server holds no per-learner state.
+   */
+  function replay() {
+    setTurns([]);
+    setInput('');
+    setProgress(0);
+    setFacts([]);
+    setReview([]);
+    setDone(null);
+    setCoachNote(null);
+    setCoachFailed(false);
+    setReviewing(false);
+    setConfirmReplay(false);
+    setActiveId(startChars[0]?.characterId ?? scene.characters[0]!.characterId);
+    inputRef.current?.focus();
+  }
 
   async function send() {
     const text = input.trim();
@@ -466,8 +487,32 @@ export function Play({
               <button className="ghost" onClick={() => setReviewing(true)}>
                 ↩ Review the conversation
               </button>
+              <button className="ghost" onClick={() => setConfirmReplay(true)}>
+                ↻ Replay scenario
+              </button>
               <button className="primary" onClick={onExit}>
                 Build another scene →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmReplay && (
+        <div className="confirm-overlay" onClick={() => setConfirmReplay(false)}>
+          {/* Stop clicks inside the box from reaching the dismiss handler above. */}
+          <div className="confirm-box" onClick={(e) => e.stopPropagation()}>
+            <h3>Start over?</h3>
+            <p>
+              You’ll replay <b>{scene.location}</b> from the beginning. This run’s results
+              are cleared — what you’ve learned so far is kept.
+            </p>
+            <div className="confirm-actions">
+              <button className="ghost" onClick={() => setConfirmReplay(false)}>
+                Cancel
+              </button>
+              <button className="primary" onClick={replay}>
+                Start over
               </button>
             </div>
           </div>

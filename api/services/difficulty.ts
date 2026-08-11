@@ -24,7 +24,7 @@ export interface DifficultySpec {
 export const DIFFICULTY: Record<number, DifficultySpec> = {
   1: {
     level: 1,
-    label: 'Very easy',
+    label: 'Beginner',
     cefr: 'A1',
     genGuidance:
       'EXACTLY ONE character. speaksAt "A1". A single, minimal objective (one simple ' +
@@ -41,7 +41,7 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
   },
   2: {
     level: 2,
-    label: 'Easy',
+    label: 'Elementary',
     cefr: 'A2',
     genGuidance:
       '1-2 characters. speaksAt "A2". A simple everyday transaction or social goal. ' +
@@ -56,7 +56,7 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
   },
   3: {
     level: 3,
-    label: 'Proficient',
+    label: 'Intermediate',
     cefr: 'B1',
     genGuidance:
       '2 characters with asymmetric knowledge. speaksAt "B1". A moderate goal with a couple ' +
@@ -71,7 +71,7 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
   },
   4: {
     level: 4,
-    label: 'Fluent',
+    label: 'Upper-intermediate',
     cefr: 'B2',
     genGuidance:
       '2-3 characters. speaksAt "B2". A complex, multi-step interaction (a mild complication ' +

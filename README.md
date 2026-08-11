@@ -39,11 +39,15 @@ version. Communication comes before perfection.
 - **Ask the right person.** In a multi-character scene every task belongs to one
   character. The concierge cannot give you the Wi-Fi password; reception can.
   Working out who holds what is part of the puzzle.
-- **Five difficulty tiers** (A1→C1). They move two dials together: how many
-  people are in the scene, and how strictly your language is graded — from
-  "meaning alone" up to near-native accuracy and register.
-- **Three outcomes per turn.** 🟢 understood · 🟡 repaired (you were
-  misunderstood, then clarified — a real skill) · 🔴 not yet.
+- **Five difficulty tiers** — Beginner (A1), Elementary (A2), Intermediate
+  (B1), Upper-intermediate (B2), Advanced (C1). They move three dials together:
+  how many people are in the scene, how strictly your language is graded, and
+  how polished the corrections you get back are. At B2 and above the objectives
+  themselves are written in the language you're practicing.
+- **Four outcomes per turn.** 🟢 understood · 🟡 repaired (you were
+  misunderstood, then clarified — a real skill) · 💡 you asked for help in the
+  target language (also a real skill) · 🔴 not yet. Understanding decides
+  progress; the corrections carry the polish.
 - **A private coach.** Never speaks in-scene. Scores every utterance, and at the
   end walks you back through the whole conversation with a natural-language
   upgrade for each line, then tells you what to study next — quoting what you

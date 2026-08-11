@@ -9,12 +9,17 @@ const PRESETS = [
   'A pharmacy in Barcelona where I need something for a headache and to ask how often to take it.',
 ];
 
+// Labels follow the CEFR levels they map to, so the blurb names the level.
 const DIFFICULTIES = [
-  { level: 1, label: 'Very easy', blurb: '1 person · just make yourself understood' },
-  { level: 2, label: 'Easy', blurb: '1–2 people · valid attempts, grammar forgiven' },
-  { level: 3, label: 'Proficient', blurb: '2 people · well-formed sentences expected' },
-  { level: 4, label: 'Fluent', blurb: '2–3 people · correct grammar, complex interaction' },
-  { level: 5, label: 'Advanced', blurb: '2–3 people · near-native, abstract goals' },
+  { level: 1, label: 'Beginner', blurb: 'A1 · 1 person · just make yourself understood' },
+  { level: 2, label: 'Elementary', blurb: 'A2 · 1–2 people · valid attempts, grammar forgiven' },
+  { level: 3, label: 'Intermediate', blurb: 'B1 · 2 people · well-formed sentences expected' },
+  {
+    level: 4,
+    label: 'Upper-intermediate',
+    blurb: 'B2 · 2–3 people · correct grammar, complex interaction',
+  },
+  { level: 5, label: 'Advanced', blurb: 'C1 · 2–3 people · near-native, abstract goals' },
 ];
 
 type Phase = 'describe' | 'art' | 'ready';

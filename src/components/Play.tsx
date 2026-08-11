@@ -37,10 +37,10 @@ const OUTCOME = {
 
 /** Scene difficulty → player-facing tier name + CEFR band. */
 const TIER: Record<number, { label: string; cefr: string }> = {
-  1: { label: 'Very easy', cefr: 'A1' },
-  2: { label: 'Easy', cefr: 'A2' },
-  3: { label: 'Proficient', cefr: 'B1' },
-  4: { label: 'Fluent', cefr: 'B2' },
+  1: { label: 'Beginner', cefr: 'A1' },
+  2: { label: 'Elementary', cefr: 'A2' },
+  3: { label: 'Intermediate', cefr: 'B1' },
+  4: { label: 'Upper-intermediate', cefr: 'B2' },
   5: { label: 'Advanced', cefr: 'C1' },
 };
 const tierOf = (d: number) => TIER[d] ?? TIER[2]!;

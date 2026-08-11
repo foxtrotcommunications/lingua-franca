@@ -80,7 +80,11 @@ app.post(
 app.post(
   '/api/play/debrief',
   wrap(async (req, res) => {
-    res.json(await debrief(req.body as DebriefRequest));
+    const note = await debrief(req.body as DebriefRequest);
+    // `note` is the legacy single-paragraph field: clients cached from before
+    // the right/improve split read it, so a deploy can't strand them on a
+    // spinner. Remove once index.html no-cache has been live a while.
+    res.json({ ...note, note: [note.right, note.improve].filter(Boolean).join(' ') });
   }),
 );
 
@@ -88,9 +92,23 @@ app.post(
 // isn't /api. In dev there is no dist/ and Vite serves the client instead.
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist');
 if (existsSync(dist)) {
-  app.use(express.static(dist));
+  // Vite content-hashes everything under /assets, so those are immutable;
+  // index.html must always revalidate or a deploy strands browsers on a stale
+  // client talking to a newer API (learned the hard way).
+  app.use(
+    express.static(dist, {
+      setHeaders: (res, filePath) => {
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    }),
+  );
   app.use((req, res, next) => {
     if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(dist, 'index.html'));
     } else {
       next();

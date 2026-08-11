@@ -193,14 +193,21 @@ async function evaluate(
   history: TurnRequest['history'],
   lang: string,
   addressed: SceneCharacter,
+  credited: ReadonlySet<string>,
 ): Promise<RawVerdict> {
   const convo = (history ?? [])
     .map((h) => `${h.role === 'learner' ? 'Learner' : 'Character'}: ${h.text}`)
     .join('\n');
   const spec = difficultyOf(scene.difficulty);
+  const missing = scene.objective.requiredFacts.filter((f) => !credited.has(f));
   const prompt = `You are a silent language coach scoring a learner's ${lang} in a role-play.
 Objective: "${scene.objective.description}".
 REQUIRED FACTS (use these exact ids): ${scene.objective.requiredFacts.map((f) => `"${f}"`).join(', ')}.
+ALREADY CREDITED to the learner: ${[...credited].map((f) => `"${f}"`).join(', ') || 'none'}.
+STILL MISSING: ${missing.map((f) => `"${f}"`).join(', ') || 'none'}. In factsThisTurn, list
+any STILL-MISSING fact that this latest message conveys — even if the learner also
+expressed it in an earlier message (it was not credited then; if they say it again now,
+credit it now). Never list ALREADY-CREDITED facts.
 The learner is speaking to ${addressed.name} (characterId "${addressed.characterId}") right now.
 GRADING BAR — level ${spec.label} (${spec.cefr}): ${spec.gradeGuidance}
 Apply this bar when deciding which requiredFacts to credit and whether meaningUnderstood is true.
@@ -214,9 +221,10 @@ Return ONE JSON object (no prose):
     wanted from this message, named after the character — e.g. \"${addressed.name}
     understood that you wanted to go to Toulouse.\" Base it on THIS message in the flow
     of the conversation.",
- "factsThisTurn": [ the required facts the learner conveyed IN THIS LATEST MESSAGE ONLY,
-    each copied VERBATIM as one of the exact ids above. Do NOT re-list facts from earlier
-    turns — only what this message conveys. Empty array if none. ],
+ "factsThisTurn": [ STILL-MISSING facts this latest message conveys, each copied VERBATIM
+    as one of the exact ids above. Information the CHARACTER mentioned does NOT make a
+    fact conveyed — but if the learner asks about it or confirms it ("C'est une table
+    dehors ?"), that DOES convey the fact: credit it here. Empty array if none. ],
  "grammar": 0..1, "vocabulary": 0..1, "naturalness": 0..1,
  "vocabUsed": [ target-language lemmas in the latest message ],
  "grammarUsed": [ {"point":"grammar-point-id","correct":true/false} ],
@@ -232,11 +240,20 @@ reachable rung for a ${spec.cefr} learner, and make the explanation match ONLY t
 your correction actually uses.
 
 HELP REQUESTS: if the latest message — written in ${lang} — asks how to say something or
-asks for help with the language itself (e.g. "comment je dis ... ?") rather than
-attempting the task, set "hintRequested": true, no facts, and set "naturalUpgrade" to the
-${lang} phrase they were asking for (with "upgradeWhy" explaining it briefly). Asking for
-help in the target language is a real conversational skill, not a failure. A help request
-written in English is wrong-language, not a hint.
+asks for help with the language itself (e.g. "comment je dis ... ?"), set "hintRequested":
+true and set "naturalUpgrade" to the ${lang} phrase they were asking for (with
+"upgradeWhy" explaining it briefly). Asking for help in the target language is a real
+conversational skill, not a failure. A help request written in English is wrong-language,
+not a hint. A message can BOTH ask for help AND attempt a task ("je voudrais une table...
+comment dit-on 'outside' ?") — still report in factsThisTurn whatever the non-help part
+of the message conveys.
+
+WHAT COUNTS AS CONVEYING A FACT: a required fact counts when THE LEARNER expresses or
+asks it — even if the character already mentioned that information first. Confirming or
+accepting something the character volunteered ("C'est une table dehors ?", "Oui, une
+table en terrasse") DOES convey the corresponding fact. The rule "do not re-list facts
+from earlier turns" means facts THE LEARNER already conveyed in their own earlier
+messages — never information merely introduced by the character.
 Judge by communicative adequacy: broken grammar with clear meaning is meaningUnderstood:true
 with a lower grammar score, NOT a failure.
 
@@ -296,7 +313,7 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
       credited,
       open,
     }),
-    evaluate(req.scene, req.utterance, req.history, lang, character),
+    evaluate(req.scene, req.utterance, req.history, lang, character, soFar),
   ]);
 
   // Accumulate the union of communicated facts across the conversation. The
@@ -321,9 +338,11 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   /** Facts said to the wrong person this turn — surfaced so the UI can redirect. */
   const misdirected: Array<{ fact: string; owner: string }> = [];
 
-  // A hint turn banks nothing — the learner asked how to say it; they still
-  // have to say it. Enforced here, not trusted to the model.
-  for (const c of wrongLanguage || hintRequested ? [] : raw.factsThisTurn ?? []) {
+  // Hint turns CAN bank facts: a message like "je voudrais une table...
+  // comment dit-on 'outside'?" both attempts a task and asks for help, and the
+  // attempt must not be swallowed by the help request. The ownership, language,
+  // and fact-matching gates below still bound what can credit.
+  for (const c of wrongLanguage ? [] : raw.factsThisTurn ?? []) {
     const cn = norm(c);
     if (!cn) continue;
     const match = reqList.find((r) => {

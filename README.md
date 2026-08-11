@@ -180,6 +180,9 @@ first build takes ~30s while the art is generated.
 
 ## Deploy (Cloud Run)
 
+Live at **https://lingua-franca.foxtrotcommunications.net** (Cloud Run domain
+mapping; DNS CNAME → `ghs.googlehosted.com`).
+
 The app ships as a single stateless container: the Express API serves the built
 client, and all learner state is client-held, so scale-to-zero is safe. The
 service account needs only `roles/aiplatform.user`.

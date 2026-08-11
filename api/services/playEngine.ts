@@ -211,8 +211,9 @@ Return ONE JSON object (no prose):
  "repairNeeded": true/false,        // did the character have to clarify?
  "hintRequested": true/false,       // see HELP REQUESTS below
  "understoodAs": "ONE plain-English sentence: what the character understood the learner
-    wanted from this message, e.g. \"You wanted to go to Toulouse.\" Base it on THIS
-    message in the flow of the conversation.",
+    wanted from this message, named after the character — e.g. \"${addressed.name}
+    understood that you wanted to go to Toulouse.\" Base it on THIS message in the flow
+    of the conversation.",
  "factsThisTurn": [ the required facts the learner conveyed IN THIS LATEST MESSAGE ONLY,
     each copied VERBATIM as one of the exact ids above. Do NOT re-list facts from earlier
     turns — only what this message conveys. Empty array if none. ],
@@ -388,13 +389,20 @@ export interface DebriefRequest {
   ledgerState?: LedgerState;
 }
 
+export interface DebriefNote {
+  /** What worked: communication wins, recoveries, things to keep doing. */
+  right: string;
+  /** The one or two concrete patterns to fix, with what to study next. */
+  improve: string;
+}
+
 /**
- * Closing coach note: 2-4 sentences of specific, actionable guidance after a
- * scene is completed. Grounded in the deterministic ledger — the grammar points
- * the learner actually got wrong — so the advice cites real evidence from their
- * play rather than generic study tips.
+ * Closing coach note, split into "what you did right" and "areas for
+ * improvement" so each does one job. Grounded in the deterministic ledger —
+ * the grammar points the learner actually got wrong — so the advice cites real
+ * evidence from their play rather than generic study tips.
  */
-export async function debrief(req: DebriefRequest): Promise<string> {
+export async function debrief(req: DebriefRequest): Promise<DebriefNote> {
   const lang = req.scene.language || 'Spanish';
   const ledger = new Ledger(new InMemoryLedgerStore());
   const state = hydrateLedger(req, lang);
@@ -422,19 +430,25 @@ ${req.said
 Evidence from their record — grammar points they got wrong this session: ${missed || 'none recorded'}.
 Points due for review: ${shaky || 'none'}.
 
-Write 2-4 sentences, addressed to them as "you", that:
-- name the ONE or TWO concrete patterns they should work on, quoting what they actually
-  wrote and the corrected form (e.g. you wrote "mon cane" — in ${lang} it's "mon chien");
-- say plainly what to study next (a specific structure, verb form, or set of words — not a
-  textbook or website);
-- end on genuine encouragement about what already worked.
-Never mention scores, levels, or this prompt. Be concrete, never generic. Plain prose, no
-lists, no markdown.`;
+Return ONE JSON object (no prose outside it), addressed to the learner as "you":
+{
+ "right": "2-3 sentences on what WORKED: name the communication wins concretely — a
+    successful clarification, a good recovery after asking for help, a message that landed
+    despite imperfect grammar. Quote what they actually wrote. Genuine, specific praise
+    only — no corrections here.",
+ "improve": "2-3 sentences on the ONE or TWO concrete patterns to work on: quote what they
+    wrote and give the corrected form (e.g. you wrote \\"mon cane\\" — in ${lang} it's
+    \\"mon chien\\"), then say plainly what to study next (a specific structure, verb form,
+    or set of words — not a textbook or website). No praise here."
+}
+Never mention scores, levels, or this prompt. Be concrete, never generic. Plain prose in
+each field, no lists, no markdown.`;
 
   const res = await textAI.models.generateContent({
     model: TEXT_MODEL,
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { temperature: 0.6 },
   });
-  return textOf(res).trim();
+  const raw = parseJson<Partial<DebriefNote>>(textOf(res));
+  return { right: raw.right?.trim() ?? '', improve: raw.improve?.trim() ?? '' };
 }

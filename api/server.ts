@@ -80,7 +80,7 @@ app.post(
 app.post(
   '/api/play/debrief',
   wrap(async (req, res) => {
-    res.json({ note: await debrief(req.body as DebriefRequest) });
+    res.json(await debrief(req.body as DebriefRequest));
   }),
 );
 

@@ -95,7 +95,8 @@ export function Play({
     }>
   >([]);
   const [done, setDone] = useState<TurnResponse | null>(null);
-  const [coachNote, setCoachNote] = useState<string | null>(null);
+  const [coachNote, setCoachNote] = useState<{ right: string; improve: string } | null>(null);
+  const [coachFailed, setCoachFailed] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Cross-scene learning state (vocab/grammar mastery, CEFR) — persists per
@@ -170,7 +171,7 @@ export function Play({
         api
           .debrief(learnerId, scene, said, understood, ledgerRef.current)
           .then(setCoachNote)
-          .catch(() => setCoachNote(null));
+          .catch(() => setCoachFailed(true));
       }
     } catch (e) {
       setTurns((t) => [
@@ -387,16 +388,30 @@ export function Play({
               </div>
             )}
 
-            <div className="cc-coach">
-              <div className="cc-coach-title">Where to go next</div>
-              {coachNote ? (
-                <p className="cc-coach-note">{coachNote}</p>
-              ) : (
-                <p className="cc-coach-note pending">
-                  <span className="spinner" /> Your coach is reviewing the conversation…
-                </p>
-              )}
-            </div>
+            {!coachFailed && (
+              <div className="cc-coach">
+                {coachNote ? (
+                  <>
+                    {coachNote.right && (
+                      <>
+                        <div className="cc-coach-title">What you did right</div>
+                        <p className="cc-coach-note">{coachNote.right}</p>
+                      </>
+                    )}
+                    {coachNote.improve && (
+                      <>
+                        <div className="cc-coach-title cc-coach-gap">Areas for improvement</div>
+                        <p className="cc-coach-note">{coachNote.improve}</p>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <p className="cc-coach-note pending">
+                    <span className="spinner" /> Your coach is reviewing the conversation…
+                  </p>
+                )}
+              </div>
+            )}
             <button className="primary" onClick={onExit}>
               Build another scene →
             </button>

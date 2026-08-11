@@ -190,6 +190,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .cc-thesis { color: var(--ink); font-style: italic; margin: 14px 0 20px; }
 .cc-coach { text-align: left; margin: 16px 0 20px; }
 .cc-coach-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px; }
+.cc-coach-gap { margin-top: 14px; }
 .cc-coach-note { color: var(--ink); line-height: 1.65; margin: 0; }
 .cc-coach-note.pending { color: var(--muted); display: flex; align-items: center; gap: 8px; }
 .completion-card .primary { align-self: center; margin: 0 auto; }

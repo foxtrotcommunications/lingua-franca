@@ -37,11 +37,11 @@ export const api = {
     understood: Array<string | null>,
     ledgerState?: LedgerBlob,
   ) =>
-    post<{ note: string }>('/api/play/debrief', {
+    post<{ right: string; improve: string }>('/api/play/debrief', {
       learnerId,
       scene,
       said,
       understood,
       ledgerState,
-    }).then((r) => r.note),
+    }),
 };

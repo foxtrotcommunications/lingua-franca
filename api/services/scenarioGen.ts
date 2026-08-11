@@ -20,7 +20,7 @@ target language, output ONE JSON object (no markdown, no prose) with this shape:
   "completeLabel": "a short celebratory 'Mission complete!' written IN THE TARGET LANGUAGE",
   "objective": {
     "id": "kebab-case",
-    "description": "the player's goal, in ENGLISH (their native language)",
+    "description": "the player's goal — in ENGLISH unless a difficulty override below says otherwise",
     "requiredFacts": [
       {
         "id": "kebab-token",
@@ -107,6 +107,13 @@ export async function generateScenario(description: string, difficulty = 2): Pro
             text:
               `${SCHEMA_INSTRUCTIONS}\n\n` +
               `Difficulty: ${spec.label} (${spec.cefr}). ${spec.genGuidance}\n\n` +
+              (spec.level >= 4
+                ? `LANGUAGE OF TASKS — OVERRIDE for this difficulty: the player reads their ` +
+                  `tasks in the language they are practicing. Write "objective.description" ` +
+                  `and EVERY requiredFact "label" in the TARGET language, not English — ` +
+                  `natural, idiomatic task phrasing at the scene's level. Machine "id"s stay ` +
+                  `kebab-case ASCII. The "briefing" stays in English.\n\n`
+                : '') +
               `Variety seed: ${varietySeed} — use it to pick fresh names and personas you ` +
               `would not usually default to.\n\n` +
               `Scene description: ${description}\n\nReturn only the JSON.`,

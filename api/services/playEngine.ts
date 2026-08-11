@@ -6,17 +6,21 @@
 // objective completion. Generalizes to any authored scene. The ADK World agent
 // (api/orchestrator) remains the "agent framework" showcase; this is the
 // responsive UI runtime over the same deterministic floor.
+//
+// STATELESS: the server holds no per-learner state between requests. The client
+// carries two things and sends them with every turn: the accumulated ledger
+// state (an opaque blob it never inspects, keyed per language in localStorage)
+// and the facts communicated so far this scene. Every ADJUDICATION — the
+// wrong-language gate, fact ownership, objective progress, ledger updates —
+// still happens here, in code, per turn; the client only stores the results.
+// This is what lets the API run on Cloud Run with scale-to-zero and multiple
+// instances without a session store.
 
-import { Ledger, InMemoryLedgerStore } from '@lingua-franca/tools-world';
-import type { CoachVerdict } from '@lingua-franca/tools-world';
+import { Ledger, InMemoryLedgerStore, emptyLedger } from '@lingua-franca/tools-world';
+import type { CoachVerdict, LedgerState } from '@lingua-franca/tools-world';
 import { textAI, TEXT_MODEL } from './genai.js';
 import { difficultyOf } from './difficulty.js';
 import type { Scene, SceneCharacter } from '../scenes/types.js';
-
-const ledger = new Ledger(new InMemoryLedgerStore());
-// Union of required facts communicated so far, per learner+scene (progress is
-// cumulative across turns, not per-utterance).
-const communicated = new Map<string, Set<string>>();
 
 export interface TurnRequest {
   learnerId: string;
@@ -24,6 +28,10 @@ export interface TurnRequest {
   utterance: string;
   characterId?: string;
   history?: Array<{ role: 'learner' | 'character'; text: string }>;
+  /** Client-held ledger state from the previous turn (absent on a fresh learner). */
+  ledgerState?: LedgerState;
+  /** Required-fact ids already communicated this scene (client-held, starts empty). */
+  factsSoFar?: string[];
 }
 
 export interface TurnResponse {
@@ -40,6 +48,22 @@ export interface TurnResponse {
   wrongLanguage: boolean;
   /** Set when they said the right thing to the wrong character — names who to ask. */
   askInstead: string | null;
+  /** Updated ledger state — the client stores this (opaquely) and returns it next turn. */
+  ledgerState: LedgerState;
+}
+
+/**
+ * Sanitize the client-held ledger blob. The client never edits it, but it is
+ * still client-held: fall back to a fresh ledger when it's missing or not
+ * plausibly ours, and re-key it to this learner + language. Tampering only
+ * cheats the learner's own progress — the per-turn gates below stay in code.
+ */
+function hydrateLedger(req: TurnRequest | DebriefRequest, lang: string): LedgerState {
+  const s = req.ledgerState;
+  if (!s || typeof s !== 'object' || typeof s.turn !== 'number' || !s.vocab || !s.grammar) {
+    return emptyLedger(req.learnerId, lang);
+  }
+  return { ...structuredClone(s), learnerId: req.learnerId, targetLanguage: lang };
 }
 
 function textOf(res: { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }): string {
@@ -176,7 +200,9 @@ ${convo ? `Conversation so far:\n${convo}\n` : ''}Latest learner message: "${utt
 export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   const lang = req.scene.language || 'Spanish';
   const character = addressedCharacter(req.scene, req.characterId);
-  const state0 = ledger.get(req.learnerId, 'es');
+  // Per-request ledger over a throwaway store: state lives with the client.
+  const ledger = new Ledger(new InMemoryLedgerStore());
+  const state0 = hydrateLedger(req, lang);
   const calibration = ledger.preConsult(state0, req.scene.objective);
 
   // Character reply and Coach verdict are independent — run them together.
@@ -188,10 +214,10 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   // Accumulate the union of communicated facts across the conversation. The
   // Coach's labels won't always string-match the required-fact ids exactly
   // (it may return "time" for "time:morning"), so match tolerantly and store
-  // the canonical required-fact id.
-  const key = `${req.learnerId}::${req.scene.id}`;
-  const soFar = communicated.get(key) ?? new Set<string>();
+  // the canonical required-fact id. The client sends the facts banked so far;
+  // only canonical required-fact ids are accepted back from it.
   const reqList = req.scene.objective.requiredFacts;
+  const soFar = new Set<string>((req.factsSoFar ?? []).filter((f) => reqList.includes(f)));
   const norm = (s: string) => s.toLowerCase().trim();
   // Wrong-language gate, enforced in code rather than trusted to the model: a
   // message written in the learner's own language earns no new credit, however
@@ -226,7 +252,6 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
       misdirected.push({ fact: match, owner });
     }
   }
-  communicated.set(key, soFar);
   const objectiveProgress = reqList.length === 0 ? 0 : soFar.size / reqList.length;
 
   const verdict: CoachVerdict = {
@@ -242,7 +267,7 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
     vocabUsed: wrongLanguage ? [] : raw.vocabUsed ?? [],
     grammarUsed: wrongLanguage ? [] : raw.grammarUsed ?? [],
   };
-  const { state } = { state: ledger.record(state0, req.scene.id, verdict) };
+  const state = ledger.record(state0, req.scene.id, verdict);
   const complete = objectiveProgress >= 1;
 
   return {
@@ -260,6 +285,7 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
       misdirected.length > 0
         ? req.scene.characters.find((c) => c.characterId === misdirected[0]!.owner)?.name ?? null
         : null,
+    ledgerState: state,
   };
 }
 
@@ -268,6 +294,8 @@ export interface DebriefRequest {
   scene: Scene;
   /** Every learner utterance from the run, in order. */
   said: string[];
+  /** Client-held ledger state — grounds the advice in real evidence. */
+  ledgerState?: LedgerState;
 }
 
 /**
@@ -278,7 +306,8 @@ export interface DebriefRequest {
  */
 export async function debrief(req: DebriefRequest): Promise<string> {
   const lang = req.scene.language || 'Spanish';
-  const state = ledger.get(req.learnerId, 'es');
+  const ledger = new Ledger(new InMemoryLedgerStore());
+  const state = hydrateLedger(req, lang);
   const shaky = ledger
     .dueForReview(state)
     .slice(0, 6)
@@ -313,9 +342,4 @@ lists, no markdown.`;
     config: { temperature: 0.6 },
   });
   return textOf(res).trim();
-}
-
-/** Reset a learner's progress for a scene (used when (re)starting a scenario). */
-export function resetScene(learnerId: string, sceneId: string): void {
-  communicated.delete(`${learnerId}::${sceneId}`);
 }

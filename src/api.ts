@@ -1,4 +1,4 @@
-import type { Scene, TurnResponse } from './types';
+import type { LedgerBlob, Scene, TurnResponse } from './types';
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -26,11 +26,12 @@ export const api = {
     utterance: string;
     characterId?: string;
     history?: { role: 'learner' | 'character'; text: string }[];
+    ledgerState?: LedgerBlob;
+    factsSoFar?: string[];
   }) => post<TurnResponse>('/api/play/turn', body),
 
-  debrief: (learnerId: string, scene: Scene, said: string[]) =>
-    post<{ note: string }>('/api/play/debrief', { learnerId, scene, said }).then((r) => r.note),
-
-  reset: (learnerId: string, sceneId: string) =>
-    post<{ ok: true }>('/api/play/reset', { learnerId, sceneId }),
+  debrief: (learnerId: string, scene: Scene, said: string[], ledgerState?: LedgerBlob) =>
+    post<{ note: string }>('/api/play/debrief', { learnerId, scene, said, ledgerState }).then(
+      (r) => r.note,
+    ),
 };

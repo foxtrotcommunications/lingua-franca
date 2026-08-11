@@ -1,16 +1,17 @@
 // Lingua Franca API server: image generation, scenario generation, and the
-// per-turn play runtime. Dev: Vite proxies /api → this server (port 8787).
+// per-turn play runtime. Stateless — all learner state is client-held (see
+// playEngine.ts), so this runs on Cloud Run with scale-to-zero.
+//
+// Dev: Vite proxies /api → this server. Production (single container): the
+// built client in dist/ is served from here as well.
 
 import express from 'express';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { generateImage, scenePrompt, characterPrompt } from './services/images.js';
 import { generateScenario } from './services/scenarioGen.js';
-import {
-  playTurn,
-  resetScene,
-  debrief,
-  type TurnRequest,
-  type DebriefRequest,
-} from './services/playEngine.js';
+import { playTurn, debrief, type TurnRequest, type DebriefRequest } from './services/playEngine.js';
 
 const app = express();
 app.use(express.json({ limit: '12mb' }));
@@ -83,11 +84,20 @@ app.post(
   }),
 );
 
-app.post('/api/play/reset', (req, res) => {
-  const { learnerId, sceneId } = req.body as { learnerId: string; sceneId: string };
-  resetScene(learnerId, sceneId);
-  res.json({ ok: true });
-});
+// Production: serve the built client (dist/) and SPA-fallback everything that
+// isn't /api. In dev there is no dist/ and Vite serves the client instead.
+const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist');
+if (existsSync(dist)) {
+  app.use(express.static(dist));
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      res.sendFile(path.join(dist, 'index.html'));
+    } else {
+      next();
+    }
+  });
+}
 
-const PORT = Number(process.env.API_PORT || 8787);
+// Cloud Run injects PORT; API_PORT is the dev override (Vite proxies to it).
+const PORT = Number(process.env.PORT || process.env.API_PORT || 8787);
 app.listen(PORT, () => console.log(`[lingua-franca] API on :${PORT}`));

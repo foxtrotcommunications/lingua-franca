@@ -6,8 +6,10 @@
  * charitable model cannot inflate a learner past what the ledger records, and
  * difficulty calibration (i+1) is COMPUTED, never narrated.
  *
- * Storage is behind LedgerStore so tests run in-memory and production swaps in
- * a Cloud SQL implementation with identical semantics.
+ * Storage is behind LedgerStore so the semantics don't depend on where state
+ * lives. The app runtime holds state client-side (the browser stores the blob
+ * and returns it each turn; the server stays stateless for Cloud Run) and uses
+ * a per-request in-memory store; the pod fleet uses per-pod stores.
  */
 
 import {

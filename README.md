@@ -55,6 +55,13 @@ Two Gemini calls run concurrently per turn: the character's in-fiction reply and
 the coach's private verdict. A deterministic ledger — plain code, no model —
 owns every progression decision.
 
+The server is **stateless**: the browser keeps the learner's ledger (an opaque
+blob it never inspects, per language) and the facts communicated so far, and
+sends both with each turn. Every adjudication — the gates below, ledger
+updates, objective progress — still happens server-side in code each turn; the
+client only stores the results. This is what lets the API run on Cloud Run
+with scale-to-zero, and it also keeps each language's ledger separate.
+
 ```mermaid
 flowchart TB
     Learner(["Learner — types anything"])
@@ -170,6 +177,25 @@ first build takes ~30s while the art is generated.
 | `GCP_IMAGE_LOCATION` | `us-central1` | Image model region |
 | `LF_MODEL` | `gemini-3.5-flash` | Text/reasoning model |
 | `LF_USE_PODS` | `false` | Route turns through the Roundtable pod fleet |
+
+## Deploy (Cloud Run)
+
+The app ships as a single stateless container: the Express API serves the built
+client, and all learner state is client-held, so scale-to-zero is safe. The
+service account needs only `roles/aiplatform.user`.
+
+```bash
+gcloud builds submit --tag us-central1-docker.pkg.dev/$GCP_PROJECT/roundtable/lingua-franca:v1
+gcloud run deploy lingua-franca \
+  --image us-central1-docker.pkg.dev/$GCP_PROJECT/roundtable/lingua-franca:v1 \
+  --region us-central1 --allow-unauthenticated \
+  --service-account lingua-franca-run@$GCP_PROJECT.iam.gserviceaccount.com \
+  --set-env-vars GCP_PROJECT=$GCP_PROJECT \
+  --max-instances 2 --memory 512Mi
+```
+
+`--max-instances` is a cost cap (each instance can fan out Vertex calls), not a
+correctness requirement.
 
 ## Project structure
 

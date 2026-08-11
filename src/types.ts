@@ -27,6 +27,14 @@ export interface Scene {
   characters: SceneCharacter[];
 }
 
+/**
+ * The learner ledger, as the client sees it: an opaque blob. The server owns
+ * its shape and every decision made from it; the client only stores it
+ * (localStorage, keyed per language) and returns it with the next turn. Never
+ * read fields off this.
+ */
+export type LedgerBlob = Record<string, unknown>;
+
 export interface TurnResponse {
   characterId: string;
   characterName: string;
@@ -39,6 +47,7 @@ export interface TurnResponse {
   factsCommunicated: string[];
   wrongLanguage?: boolean;
   askInstead?: string | null;
+  ledgerState: LedgerBlob;
 }
 
 export type ChatTurn =

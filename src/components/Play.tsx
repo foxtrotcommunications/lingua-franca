@@ -1,7 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ChatTurn, SceneCharacter, TurnResponse } from '../types';
+import type { ChatTurn, LedgerBlob, SceneCharacter, TurnResponse } from '../types';
 import { api } from '../api';
 import type { SceneBundle } from '../App';
+
+/**
+ * The learner ledger lives client-side, keyed per target language, as an
+ * opaque blob the server returns after every turn. The server is stateless
+ * (Cloud Run scale-to-zero safe); it re-adjudicates every turn in code and the
+ * client just keeps the accumulated state between requests.
+ */
+const ledgerKey = (language: string) => `lf:ledger:${language.toLowerCase()}`;
+
+function loadLedger(language: string): LedgerBlob | undefined {
+  try {
+    const raw = localStorage.getItem(ledgerKey(language));
+    return raw ? (JSON.parse(raw) as LedgerBlob) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function saveLedger(language: string, state: LedgerBlob): void {
+  try {
+    localStorage.setItem(ledgerKey(language), JSON.stringify(state));
+  } catch {
+    // Storage full or blocked — play continues, progress just won't persist.
+  }
+}
 
 const OUTCOME = {
   understood: { dot: '🟢', label: 'Understood' },
@@ -66,9 +91,11 @@ export function Play({
   const [coachNote, setCoachNote] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Cross-scene learning state (vocab/grammar mastery, CEFR) — persists per
+  // language. Scene progress (`facts`) intentionally starts empty each run.
+  const ledgerRef = useRef<LedgerBlob | undefined>(loadLedger(scene.language));
 
   useEffect(() => {
-    void api.reset(learnerId, scene.id);
     inputRef.current?.focus();
   }, [learnerId, scene.id]);
 
@@ -89,7 +116,17 @@ export function Play({
     setTurns((t) => [...t, { role: 'learner', text }]);
     setThinking(true);
     try {
-      const r = await api.turn({ learnerId, scene, utterance: text, characterId: activeId, history });
+      const r = await api.turn({
+        learnerId,
+        scene,
+        utterance: text,
+        characterId: activeId,
+        history,
+        ledgerState: ledgerRef.current,
+        factsSoFar: facts,
+      });
+      ledgerRef.current = r.ledgerState;
+      saveLedger(scene.language, r.ledgerState);
       setTurns((t) => {
         const copy = [...t];
         for (let i = copy.length - 1; i >= 0; i--) {
@@ -111,9 +148,10 @@ export function Play({
       setReview((v) => [...v, { said: text, outcome: r.outcome, upgrade: r.naturalUpgrade }]);
       if (r.complete) {
         setDone(r);
-        // Closing coach note — generated from everything they said this run.
+        // Closing coach note — generated from everything they said this run,
+        // grounded in the ledger they just accumulated.
         api
-          .debrief(learnerId, scene, said)
+          .debrief(learnerId, scene, said, ledgerRef.current)
           .then(setCoachNote)
           .catch(() => setCoachNote(null));
       }

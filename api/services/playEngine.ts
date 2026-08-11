@@ -50,6 +50,8 @@ export interface TurnResponse {
   factsCommunicated: string[];
   /** True when the learner wrote in the wrong language (no credit earned). */
   wrongLanguage: boolean;
+  /** True when foreign words cost the turn its credit (tiers 4-5 only). */
+  mixedLanguage: boolean;
   /** Set when they said the right thing to the wrong character — names who to ask. */
   askInstead: string | null;
   /** Updated ledger state — the client stores this (opaquely) and returns it next turn. */
@@ -113,7 +115,10 @@ talking — nudge, don't hand-hold.`;
   return `Do NOT steer, hint, or prompt for their tasks — the learner must drive the
 conversation. And at this level, if their ${lang} is genuinely broken or unnatural for
 this setting, react as a real native would: ask them to repeat or say it more clearly (a
-repair) rather than fully granting the request. Comply only with well-formed requests.`;
+repair) rather than fully granting the request. Comply only with well-formed requests.
+If they drop words from another language into a sentence, do not quietly absorb them: say
+politely, in character and in ${lang}, that you didn't catch that word and ask them to put
+it in ${lang} — at this level they are expected to find it themselves.`;
 }
 
 async function generateReply(
@@ -180,6 +185,11 @@ interface RawVerdict {
   hintRequested?: boolean;
   /** The character caught the topic but lacks the specifics needed to act. */
   clarificationNeeded?: boolean;
+  /**
+   * The learner substituted words from another language mid-sentence. Reported
+   * at every level; only tiers 4-5 act on it (see playTurn).
+   */
+  languageMixing?: boolean;
   /** One English sentence: what the character understood the learner wanted. */
   understoodAs?: string;
   /** Required facts conveyed in the latest message only (ownership is per-turn). */
@@ -255,6 +265,7 @@ Return ONE JSON object (no prose):
  "meaningUnderstood": true/false,   // would the character grasp THIS latest message?
  "repairNeeded": true/false,        // rough language, but the character could still act
  "clarificationNeeded": true/false, // see ACTIONABLE COMMUNICATION below
+ "languageMixing": true/false,      // see LANGUAGE MIXING below
  "hintRequested": true/false,       // see HELP REQUESTS below
  "understoodAs": "ONE plain-English sentence: what the character understood the learner
     wanted from this message, named after the character — e.g. \"${addressed.name}
@@ -277,6 +288,14 @@ CORRECTION BAR — ${spec.feedbackGuidance}
 The upgrade is a teaching step, not a rewrite into polished native ${lang}: give the next
 reachable rung for a ${spec.cefr} learner, and make the explanation match ONLY the pattern
 your correction actually uses.
+
+LANGUAGE MIXING: set "languageMixing": true when the message reaches into ANOTHER language
+mid-sentence — words from Spanish, Italian, English or elsewhere standing in for ${lang}
+words the learner didn't have ("ma appartement", "molte manque", "je preferre por euros").
+It is NOT mixing when the word is genuinely used in ${lang} (an established loanword), a
+proper noun, or a place name. Report this honestly whatever the level; it is not by itself
+a failure, and it never makes a message wrong-language — that is only for a message written
+entirely in another language.
 
 HELP REQUESTS: if the latest message — written in ${lang} — asks how to say something or
 asks for help with the language itself (e.g. "comment je dis ... ?"), set "hintRequested":
@@ -370,6 +389,15 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   // anything, so nothing was actually communicated. Enforced here rather than
   // trusted to the model, which will happily infer specifics never said.
   const clarificationNeeded = !wrongLanguage && !hintRequested && raw.clarificationNeeded === true;
+  // Borrowing from another language mid-sentence is part of the wedge at tiers
+  // 1-3 — getting through by any means is the point. From Upper-intermediate up
+  // it is not: the level's promise is producing the language yourself, so a
+  // mixed message doesn't bank the fact even when the character follows it.
+  const mixingBlocks =
+    difficultyOf(req.scene.difficulty).level >= 4 &&
+    !wrongLanguage &&
+    !hintRequested &&
+    raw.languageMixing === true;
   // Ownership: in a multi-character scene each fact belongs to one character,
   // and only that character can be told/asked it. Enforced here rather than
   // trusted to the model — working out who holds what IS the puzzle.
@@ -388,7 +416,7 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   // attempt must not be swallowed by the help request. The ownership, language,
   // and fact-matching gates below still bound what can credit. A turn that left
   // the character unable to act banks nothing.
-  for (const c of wrongLanguage || clarificationNeeded ? [] : raw.factsThisTurn ?? []) {
+  for (const c of wrongLanguage || clarificationNeeded || mixingBlocks ? [] : raw.factsThisTurn ?? []) {
     const cn = norm(c);
     if (!cn) continue;
     const match = reqList.find((r) => {
@@ -432,10 +460,9 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   // still records it as comprehended: the character understood fine, they were
   // simply not the one who could act on it.)
   const base = ledger.outcome(verdict);
-  const outcome =
-    (base === 'understood' || base === 'repaired') && creditedThisTurn === 0 && misdirected.length > 0
-      ? 'partial'
-      : base;
+  const noProgress =
+    (creditedThisTurn === 0 && misdirected.length > 0) || (mixingBlocks && creditedThisTurn === 0);
+  const outcome = (base === 'understood' || base === 'repaired') && noProgress ? 'partial' : base;
 
   return {
     characterId: character.characterId,
@@ -450,6 +477,7 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
     upgradeWhy: raw.upgradeWhy?.trim() || null,
     factsCommunicated: [...soFar],
     wrongLanguage,
+    mixedLanguage: mixingBlocks,
     askInstead:
       misdirected.length > 0
         ? req.scene.characters.find((c) => c.characterId === misdirected[0]!.owner)?.name ?? null

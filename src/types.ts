@@ -52,6 +52,8 @@ export interface TurnResponse {
   upgradeWhy: string | null;
   factsCommunicated: string[];
   wrongLanguage?: boolean;
+  /** Foreign words cost this turn its credit (Upper-intermediate and above). */
+  mixedLanguage?: boolean;
   askInstead?: string | null;
   ledgerState: LedgerBlob;
 }
@@ -62,6 +64,7 @@ export type ChatTurn =
       text: string;
       outcome?: TurnResponse['outcome'];
       wrongLanguage?: boolean;
+      mixedLanguage?: boolean;
       askInstead?: string | null;
     }
   | { role: 'character'; text: string; characterName: string };

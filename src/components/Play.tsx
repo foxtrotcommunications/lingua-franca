@@ -150,6 +150,7 @@ export function Play({
               ...copy[i],
               outcome: r.outcome,
               wrongLanguage: r.wrongLanguage,
+              mixedLanguage: r.mixedLanguage,
               askInstead: r.askInstead,
             } as ChatTurn;
             break;
@@ -285,7 +286,12 @@ export function Play({
                 {!t.wrongLanguage && !t.askInstead && t.outcome === 'repaired' && (
                   <span className="lang-nudge">Understood — worth polishing, see your debrief</span>
                 )}
-                {!t.wrongLanguage && !t.askInstead && t.outcome === 'partial' && (
+                {!t.wrongLanguage && !t.askInstead && t.mixedLanguage && (
+                  <span className="lang-nudge">
+                    Say it all in {scene.language} — at this level, no borrowed words
+                  </span>
+                )}
+                {!t.wrongLanguage && !t.askInstead && !t.mixedLanguage && t.outcome === 'partial' && (
                   <span className="lang-nudge">
                     Not enough to go on — answer what they’re asking
                   </span>

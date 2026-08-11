@@ -265,6 +265,9 @@ export function Play({
                 {!t.wrongLanguage && t.askInstead && (
                   <span className="lang-nudge">{t.askInstead} is the one to ask about that</span>
                 )}
+                {!t.wrongLanguage && !t.askInstead && t.outcome === 'repaired' && (
+                  <span className="lang-nudge">Understood — worth polishing, see your debrief</span>
+                )}
               </div>
             ) : (
               <div key={i} className="bubble character">

@@ -73,6 +73,13 @@ Rules:
   growing."). Never generic filler, never mention grammar, scores, or the game itself.
 - Cast size, character level (speaksAt), and objective complexity MUST follow the
   difficulty guidance provided below.
+- DECISIONS ARE NOT ANSWERS. When the scene asks the learner to choose among options they
+  discover in conversation (a recommendation, comparing dishes, weighing alternatives),
+  the requiredFact's label must name the ACT of deciding — "Order the dessert you chose",
+  "Book the tour you picked" — NEVER the specific correct option. The options live in the
+  characters' "knows" lists; discovering them and deciding IS the play. Revealing the
+  answer in the checklist would collapse the decision into confirmation. Use a generic
+  fact id too ("order-chosen-dessert", not the option's name).
 `.trim();
 
 /** Best-effort JSON extraction from a model response. */

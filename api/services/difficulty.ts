@@ -62,8 +62,9 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
       '2 characters with asymmetric knowledge. speaksAt "B1". A moderate goal with a couple ' +
       'of steps. 3-4 requiredFacts.',
     gradeGuidance:
-      'Credit a required fact only if conveyed in a reasonably well-formed sentence (minor ' +
-      'grammar slips are ok, but not broken word-salad).',
+      'Understanding requires a reasonably well-formed sentence — broken word-salad reads ' +
+      'as a repair (🟡) or a failure, not clean comprehension. Once the meaning lands, even ' +
+      'via repair, the facts credit; the correction flags the quality gap.',
     feedbackGuidance:
       'Corrections should be natural phrasing within reach of an intermediate learner — no ' +
       'advanced constructions. One pattern per correction, explanation 1-2 sentences.',
@@ -76,8 +77,10 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
       '2-3 characters. speaksAt "B2". A complex, multi-step interaction (a mild complication ' +
       'to navigate). 4-5 requiredFacts. Characters speak at a natural pace.',
     gradeGuidance:
-      'Be strict. Credit a required fact only if conveyed with correct grammar AND natural ' +
-      'phrasing. Broken or awkward grammar does NOT pass at this level.',
+      'Be strict about what counts as understood: at this level broken or awkward grammar ' +
+      'reads as needing repair (🟡) or as not understood (🔴) — a native in this setting ' +
+      'would ask them to say it again. Once genuinely understood, even via repair, the ' +
+      'facts credit; withhold credit only when the meaning did not land.',
     feedbackGuidance:
       'Corrections at fully natural native phrasing; explanations may name register and ' +
       'nuance in 1-2 sentences.',
@@ -91,8 +94,10 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
       'complain, explain, or resolve a problem). 4-5 requiredFacts. Characters speak naturally ' +
       'and idiomatically, at native pace.',
     gradeGuidance:
-      'Hold a high bar. Credit a required fact only if conveyed with near-native accuracy, ' +
-      'appropriate register, and well-developed language — not just a bare minimal phrase.',
+      'Hold a high bar for understanding: anything short of near-native accuracy and ' +
+      'appropriate register reads as needing repair (🟡), and bare minimal phrases or ' +
+      'broken language as not understood (🔴) — this is a demanding setting. Once ' +
+      'genuinely understood, even via repair, the facts credit.',
     feedbackGuidance:
       'Corrections at native polish, including register and idiom; detailed explanations ' +
       'are appropriate at this level.',

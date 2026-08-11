@@ -210,7 +210,17 @@ expressed it in an earlier message (it was not credited then; if they say it aga
 credit it now). Never list ALREADY-CREDITED facts.
 The learner is speaking to ${addressed.name} (characterId "${addressed.characterId}") right now.
 GRADING BAR — level ${spec.label} (${spec.cefr}): ${spec.gradeGuidance}
-Apply this bar when deciding which requiredFacts to credit and whether meaningUnderstood is true.
+Apply this bar when deciding whether meaningUnderstood is true.
+
+CREDIT FOLLOWS UNDERSTANDING: if meaningUnderstood is true — including when a repair was
+needed (🟡) — credit the facts the message conveys. Never withhold a fact for imperfect
+language once the meaning landed: the repair marker, scores, and correction carry the
+quality feedback. The grading bar governs how strictly you judge UNDERSTANDING at this
+level, not a second perfection gate on top of it.
+
+OPEN DECISION FACTS: a fact like "order the dessert you chose" is conveyed when the
+learner orders or states ANY option that has come up in the conversation — there is no
+single correct option.
 Return ONE JSON object (no prose):
 {
  "communicativeIntent": "short label",

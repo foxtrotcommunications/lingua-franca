@@ -1,0 +1,7 @@
+# Ship the TS sources (core esbuilds them at image-build time, like tools-plaid),
+# but not tests or tooling config.
+*.test.ts
+vitest.config.ts
+tsconfig.json
+dist/
+node_modules/

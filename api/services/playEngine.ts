@@ -100,6 +100,13 @@ function addressedCharacter(scene: Scene, characterId?: string): SceneCharacter 
  * the hint). At the top tiers the learner drives, and the character's
  * willingness to comply mirrors the Coach's grading bar so the fiction doesn't
  * grant what the ledger refuses.
+ *
+ * The distinction that matters at tiers 4-5 is DIEGETIC vs PEDAGOGICAL
+ * steering. "Now go and ask Thibault" is coaching and has no place at C1. A
+ * stakeholder saying "if Thibault agrees to move the schedule we might have a
+ * deal — but I doubt it" is not coaching, it is a person with interests
+ * applying realistic pressure. Banning both is what let a C1 negotiation drift
+ * politely away from its objectives for turns on end.
  */
 function taskStance(level: number, lang: string): string {
   if (level <= 2) {
@@ -112,8 +119,14 @@ character, as a real person would. Be forgiving and encouraging.`;
     return `You may prompt naturally for their open tasks, but let the learner do the
 talking — nudge, don't hand-hold.`;
   }
-  return `Do NOT steer, hint, or prompt for their tasks — the learner must drive the
-conversation. And at this level, if their ${lang} is genuinely broken or unnatural for
+  return `Never coach and never hand-hold: do not name their tasks, do not tell them what
+to say or who to go and speak to, and never step out of the fiction to teach. But you are
+not passive either — you are a person with your own stake in this, so PUSH IT IN FICTION.
+Keep your own unfinished business alive, come back to what you still need, and when the
+conversation reaches something that is not yours to settle, say so the way a real person
+would ("si Thibault accepte de revoir le calendrier, on tient peut-être une solution — mais
+j'en doute"). Let the conversation range, then bring it back to what is still unresolved.
+And at this level, if their ${lang} is genuinely broken or unnatural for
 this setting, react as a real native would: ask them to repeat or say it more clearly (a
 repair) rather than fully granting the request. Comply only with well-formed requests.
 If they drop words from another language into a sentence, do not quietly absorb them: say
@@ -128,7 +141,7 @@ async function generateReply(
   calibration: { known: string[]; avoid: string[] },
   history: TurnRequest['history'],
   lang: string,
-  taskState: { credited: string[]; open: string[] },
+  taskState: { credited: string[]; open: string[]; elsewhere: string[] },
 ): Promise<string> {
   const hist = (history ?? [])
     .slice(-8)
@@ -151,6 +164,14 @@ communication that did not happen.
 The learner is here to accomplish: "${scene.objective.description}".
 ${taskState.credited.length ? `Already handled — do NOT ask about these again: ${taskState.credited.join('; ')}.` : ''}
 ${taskState.open.length ? `Still open with YOU (the learner must say these to you): ${taskState.open.join('; ')}.` : ''}
+${
+  taskState.elsewhere.length
+    ? `Still unsettled with OTHER people here: ${taskState.elsewhere.join('; ')}. This is not
+yours to settle and you must NOT settle it or invite them to go and do it — but you know
+this business is hanging, so let it show the way a real person would: worry about it,
+doubt the other person will agree, say your own solution depends on it.`
+    : ''
+}
 ${taskStance(level, lang)}
 If the learner explicitly asks (in ${lang}) how to say something, help them — give the
 phrase warmly, in character, as a real person would at any level.
@@ -358,11 +379,21 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   // already banked (don't re-ask) and which open ones belong to THEM (steer
   // toward these at easy tiers). Human checklist labels, not machine ids.
   const labelOf = (i: number) => req.scene.objective.checklist?.[i] ?? reqList[i]!;
+  const nameOf = (id: string) =>
+    req.scene.characters.find((c) => c.characterId === id)?.name ?? id;
   const credited: string[] = [];
   const open: string[] = [];
+  /**
+   * Open tasks belonging to OTHER characters. A character who only knows their
+   * own tasks can't feel the pull of what's still unsettled elsewhere, which is
+   * how a negotiation drifts amiably away from its objectives — so they get the
+   * shape of it (who, what) to reference in fiction, never the mechanics.
+   */
+  const elsewhere: string[] = [];
   reqList.forEach((f, i) => {
     if (soFar.has(f)) credited.push(labelOf(i));
     else if (!owners[i] || owners[i] === character.characterId) open.push(labelOf(i));
+    else elsewhere.push(`${nameOf(owners[i]!)}: ${labelOf(i)}`);
   });
 
   // Character reply and Coach verdict are independent — run them together.
@@ -370,6 +401,7 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
     generateReply(req.scene, character, req.utterance, calibration, req.history, lang, {
       credited,
       open,
+      elsewhere,
     }),
     evaluate(req.scene, req.utterance, req.history, lang, character, soFar),
   ]);

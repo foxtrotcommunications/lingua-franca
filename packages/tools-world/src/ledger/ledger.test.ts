@@ -76,6 +76,17 @@ describe('Ledger — deterministic floor', () => {
     expect(cal.known).not.toContain('payment');
   });
 
+  it('a hint request is its own outcome and does not move comprehension', () => {
+    const ledger = new Ledger(new InMemoryLedgerStore());
+    expect(ledger.outcome(verdict({ hintRequested: true }))).toBe('hint');
+    // hint wins even if the coach also marked the meaning as not understood
+    expect(ledger.outcome(verdict({ hintRequested: true, meaningUnderstood: false }))).toBe('hint');
+    let state = ledger.get('learner-h', 'es');
+    state = ledger.record(state, SCENE, verdict({ meaningUnderstood: true }));
+    state = ledger.record(state, SCENE, verdict({ hintRequested: true, meaningUnderstood: false }));
+    expect(ledger.comprehensionRate(state)).toBeCloseTo(1); // hint turn not sampled
+  });
+
   it('comprehension rate is a rolling fraction of understood turns', () => {
     const ledger = new Ledger(new InMemoryLedgerStore());
     let state = ledger.get('learner-5', 'es');

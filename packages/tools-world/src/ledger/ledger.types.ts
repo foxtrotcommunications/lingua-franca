@@ -10,8 +10,12 @@ export const CEFR_ORDER: readonly Cefr[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 export type GrammarPointId = string;
 export type VocabId = string;
 
-/** The three outcomes of a communicative attempt — richer than pass/fail. */
-export type Outcome = 'understood' | 'repaired' | 'failed';
+/**
+ * Outcomes of a communicative attempt — richer than pass/fail. 'hint' is a
+ * help request made in the target language ("comment je dis... ?"): a real
+ * conversational skill, counted as neither success nor failure.
+ */
+export type Outcome = 'understood' | 'repaired' | 'failed' | 'hint';
 
 /**
  * The Coach's private evaluation of one learner utterance. Scores are 0..1.
@@ -22,6 +26,8 @@ export interface CoachVerdict {
   communicativeIntent: string;
   meaningUnderstood: boolean;
   repairNeeded: boolean;
+  /** The learner asked (in the target language) how to say something. */
+  hintRequested?: boolean;
   objectiveProgress: number;
   grammar: number;
   vocabulary: number;

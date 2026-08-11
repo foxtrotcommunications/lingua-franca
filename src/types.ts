@@ -39,11 +39,15 @@ export interface TurnResponse {
   characterId: string;
   characterName: string;
   reply: string;
-  outcome: 'understood' | 'repaired' | 'failed';
+  outcome: 'understood' | 'repaired' | 'failed' | 'hint';
   objectiveProgress: number;
   complete: boolean;
   cefr: string;
+  /** What the character understood the learner wanted, in English. */
+  understoodAs: string | null;
   naturalUpgrade: string | null;
+  /** Why the naturalUpgrade is an improvement (1-2 English sentences). */
+  upgradeWhy: string | null;
   factsCommunicated: string[];
   wrongLanguage?: boolean;
   askInstead?: string | null;

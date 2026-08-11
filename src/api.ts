@@ -30,8 +30,18 @@ export const api = {
     factsSoFar?: string[];
   }) => post<TurnResponse>('/api/play/turn', body),
 
-  debrief: (learnerId: string, scene: Scene, said: string[], ledgerState?: LedgerBlob) =>
-    post<{ note: string }>('/api/play/debrief', { learnerId, scene, said, ledgerState }).then(
-      (r) => r.note,
-    ),
+  debrief: (
+    learnerId: string,
+    scene: Scene,
+    said: string[],
+    understood: Array<string | null>,
+    ledgerState?: LedgerBlob,
+  ) =>
+    post<{ note: string }>('/api/play/debrief', {
+      learnerId,
+      scene,
+      said,
+      understood,
+      ledgerState,
+    }).then((r) => r.note),
 };

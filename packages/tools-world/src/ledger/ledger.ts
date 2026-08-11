@@ -98,9 +98,13 @@ export class Ledger {
       next.grammar[g.point] = stat;
     }
 
-    next.comprehensionSamples.push(verdict.meaningUnderstood);
-    if (next.comprehensionSamples.length > COMPREHENSION_WINDOW) {
-      next.comprehensionSamples.splice(0, next.comprehensionSamples.length - COMPREHENSION_WINDOW);
+    // A hint request is neither understood nor failed — it must not move the
+    // comprehension rate in either direction.
+    if (!verdict.hintRequested) {
+      next.comprehensionSamples.push(verdict.meaningUnderstood);
+      if (next.comprehensionSamples.length > COMPREHENSION_WINDOW) {
+        next.comprehensionSamples.splice(0, next.comprehensionSamples.length - COMPREHENSION_WINDOW);
+      }
     }
 
     // Objective progress is monotonic — a later weaker utterance never regresses it.
@@ -120,6 +124,7 @@ export class Ledger {
 
   /** Deterministic tier from the verdict alone. */
   outcome(verdict: CoachVerdict): Outcome {
+    if (verdict.hintRequested) return 'hint';
     if (!verdict.meaningUnderstood) return 'failed';
     return verdict.repairNeeded ? 'repaired' : 'understood';
   }

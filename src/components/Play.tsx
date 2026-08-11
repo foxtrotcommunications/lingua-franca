@@ -32,6 +32,7 @@ const OUTCOME = {
   understood: { dot: '🟢', label: 'Understood' },
   repaired: { dot: '🟡', label: 'Repaired' },
   failed: { dot: '🔴', label: 'Not yet' },
+  hint: { dot: '💡', label: 'Asked for help' },
 } as const;
 
 /** Scene difficulty → player-facing tier name + CEFR band. */
@@ -85,7 +86,13 @@ export function Play({
   // Per-exchange coach notes, accumulated so the completion card can walk the
   // learner back through everything they said.
   const [review, setReview] = useState<
-    Array<{ said: string; outcome: TurnResponse['outcome']; upgrade: string | null }>
+    Array<{
+      said: string;
+      outcome: TurnResponse['outcome'];
+      understoodAs: string | null;
+      upgrade: string | null;
+      upgradeWhy: string | null;
+    }>
   >([]);
   const [done, setDone] = useState<TurnResponse | null>(null);
   const [coachNote, setCoachNote] = useState<string | null>(null);
@@ -145,13 +152,23 @@ export function Play({
       setProgress(r.objectiveProgress);
       setFacts(r.factsCommunicated);
       const said = [...review.map((v) => v.said), text];
-      setReview((v) => [...v, { said: text, outcome: r.outcome, upgrade: r.naturalUpgrade }]);
+      const understood = [...review.map((v) => v.understoodAs), r.understoodAs];
+      setReview((v) => [
+        ...v,
+        {
+          said: text,
+          outcome: r.outcome,
+          understoodAs: r.understoodAs,
+          upgrade: r.naturalUpgrade,
+          upgradeWhy: r.upgradeWhy,
+        },
+      ]);
       if (r.complete) {
         setDone(r);
         // Closing coach note — generated from everything they said this run,
         // grounded in the ledger they just accumulated.
         api
-          .debrief(learnerId, scene, said, ledgerRef.current)
+          .debrief(learnerId, scene, said, understood, ledgerRef.current)
           .then(setCoachNote)
           .catch(() => setCoachNote(null));
       }
@@ -295,24 +312,78 @@ export function Play({
               difficulty.
             </p>
 
+            {(() => {
+              const hints = review.filter((r) => r.outcome === 'hint').length;
+              const attempts = review.length - hints;
+              const landed = review.filter(
+                (r) => r.outcome === 'understood' || r.outcome === 'repaired',
+              ).length;
+              return (
+                <div className="cc-stats">
+                  <div className="cc-stat">
+                    <span className="cc-stat-n">
+                      {facts.length}/{scene.objective.requiredFacts.length}
+                    </span>
+                    <span className="cc-stat-l">objectives</span>
+                  </div>
+                  <div className="cc-stat">
+                    <span className="cc-stat-n">
+                      {landed}/{attempts}
+                    </span>
+                    <span className="cc-stat-l">understood</span>
+                  </div>
+                  {hints > 0 && (
+                    <div className="cc-stat">
+                      <span className="cc-stat-n">💡 {hints}</span>
+                      <span className="cc-stat-l">
+                        {hints === 1 ? 'hint — good recovery' : 'hints — good recovery'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="cc-stat">
+                    <span className="cc-stat-n">{tierOf(scene.difficulty).cefr}</span>
+                    <span className="cc-stat-l">{tierOf(scene.difficulty).label}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             {review.length > 0 && (
               <div className="cc-review">
-                <div className="cc-review-title">What you said</div>
-                {review.map((r, i) => (
-                  <div key={i} className="cc-row">
-                    <span className="cc-dot" title={OUTCOME[r.outcome].label}>
-                      {OUTCOME[r.outcome].dot}
-                    </span>
-                    <div className="cc-row-body">
-                      <div className="cc-said">“{r.said}”</div>
-                      {r.upgrade && r.upgrade.trim().toLowerCase() !== r.said.trim().toLowerCase() && (
-                        <div className="cc-better">
-                          <span className="cc-arrow">→</span> {r.upgrade}
-                        </div>
-                      )}
+                <div className="cc-review-title">Your communication</div>
+                {review.map((r, i) => {
+                  const upgraded =
+                    r.upgrade && r.upgrade.trim().toLowerCase() !== r.said.trim().toLowerCase();
+                  return (
+                    <div key={i} className="cc-row">
+                      <span className="cc-dot" title={OUTCOME[r.outcome].label}>
+                        {OUTCOME[r.outcome].dot}
+                      </span>
+                      <div className="cc-row-body">
+                        <div className="cc-said">“{r.said}”</div>
+                        {r.outcome === 'hint' ? (
+                          <>
+                            {r.upgrade && (
+                              <div className="cc-better">You were given: {r.upgrade}</div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {r.understoodAs && <div className="cc-meant">{r.understoodAs}</div>}
+                            {upgraded && (
+                              <div className="cc-better">
+                                <span className="cc-arrow">→</span> {r.upgrade}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {r.upgradeWhy && (r.outcome === 'hint' || upgraded) && (
+                          <div className="cc-why">{r.upgradeWhy}</div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

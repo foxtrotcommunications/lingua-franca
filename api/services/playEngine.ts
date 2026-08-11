@@ -38,11 +38,15 @@ export interface TurnResponse {
   characterId: string;
   characterName: string;
   reply: string;
-  outcome: 'understood' | 'repaired' | 'failed';
+  outcome: 'understood' | 'repaired' | 'failed' | 'hint';
   objectiveProgress: number;
   complete: boolean;
   cefr: string;
+  /** What the character understood the learner wanted, in English. */
+  understoodAs: string | null;
   naturalUpgrade: string | null;
+  /** 1-2 English sentences: why the naturalUpgrade is an improvement. */
+  upgradeWhy: string | null;
   factsCommunicated: string[];
   /** True when the learner wrote in the wrong language (no credit earned). */
   wrongLanguage: boolean;
@@ -138,6 +142,8 @@ The learner is here to accomplish: "${scene.objective.description}".
 ${taskState.credited.length ? `Already handled — do NOT ask about these again: ${taskState.credited.join('; ')}.` : ''}
 ${taskState.open.length ? `Still open with YOU (the learner must say these to you): ${taskState.open.join('; ')}.` : ''}
 ${taskStance(level, lang)}
+If the learner explicitly asks (in ${lang}) how to say something, help them — give the
+phrase warmly, in character, as a real person would at any level.
 Stay warm and in character.
 YOU DO NOT SPEAK ENGLISH. If the learner writes in English (or any language that is not
 ${lang}), you cannot understand them: react in character as a real ${lang} speaker would —
@@ -165,6 +171,10 @@ interface RawVerdict {
   repairNeeded?: boolean;
   /** Set when the learner wrote in the wrong language entirely — earns no credit. */
   wrongLanguage?: boolean;
+  /** The learner asked, in the target language, how to say something. */
+  hintRequested?: boolean;
+  /** One English sentence: what the character understood the learner wanted. */
+  understoodAs?: string;
   /** Required facts conveyed in the latest message only (ownership is per-turn). */
   factsThisTurn?: string[];
   grammar?: number;
@@ -173,6 +183,8 @@ interface RawVerdict {
   vocabUsed?: string[];
   grammarUsed?: Array<{ point: string; correct: boolean }>;
   naturalUpgrade?: string;
+  /** 1-2 English sentences: why the naturalUpgrade is an improvement. */
+  upgradeWhy?: string;
 }
 
 async function evaluate(
@@ -197,14 +209,30 @@ Return ONE JSON object (no prose):
  "communicativeIntent": "short label",
  "meaningUnderstood": true/false,   // would the character grasp THIS latest message?
  "repairNeeded": true/false,        // did the character have to clarify?
+ "hintRequested": true/false,       // see HELP REQUESTS below
+ "understoodAs": "ONE plain-English sentence: what the character understood the learner
+    wanted from this message, e.g. \"You wanted to go to Toulouse.\" Base it on THIS
+    message in the flow of the conversation.",
  "factsThisTurn": [ the required facts the learner conveyed IN THIS LATEST MESSAGE ONLY,
     each copied VERBATIM as one of the exact ids above. Do NOT re-list facts from earlier
     turns — only what this message conveys. Empty array if none. ],
  "grammar": 0..1, "vocabulary": 0..1, "naturalness": 0..1,
  "vocabUsed": [ target-language lemmas in the latest message ],
  "grammarUsed": [ {"point":"grammar-point-id","correct":true/false} ],
- "naturalUpgrade": "the most natural way to say the latest message, in ${lang}"
+ "naturalUpgrade": "the most natural way to say the latest message, in ${lang}",
+ "upgradeWhy": "1-2 plain-English sentences explaining WHY naturalUpgrade is better than
+    what they wrote — name the specific grammar point, word choice, or idiom that changed
+    (e.g. \"French needs a subject pronoun with the verb: 'voulez aller' has no subject,
+    so it reads as a question to someone else. 'Je voudrais' says who wants it, politely.\").
+    Empty string if their sentence was already natural."
 }
+
+HELP REQUESTS: if the latest message — written in ${lang} — asks how to say something or
+asks for help with the language itself (e.g. "comment je dis ... ?") rather than
+attempting the task, set "hintRequested": true, no facts, and set "naturalUpgrade" to the
+${lang} phrase they were asking for (with "upgradeWhy" explaining it briefly). Asking for
+help in the target language is a real conversational skill, not a failure. A help request
+written in English is wrong-language, not a hint.
 Judge by communicative adequacy: broken grammar with clear meaning is meaningUnderstood:true
 with a lower grammar score, NOT a failure.
 
@@ -276,6 +304,8 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   // message written in the learner's own language earns no new credit, however
   // clear its intent. Facts banked in earlier target-language turns stand.
   const wrongLanguage = raw.wrongLanguage === true;
+  // Wrong-language wins over hint: asking for help in English is still English.
+  const hintRequested = !wrongLanguage && raw.hintRequested === true;
   // Ownership: in a multi-character scene each fact belongs to one character,
   // and only that character can be told/asked it. Enforced here rather than
   // trusted to the model — working out who holds what IS the puzzle.
@@ -287,7 +317,9 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   /** Facts said to the wrong person this turn — surfaced so the UI can redirect. */
   const misdirected: Array<{ fact: string; owner: string }> = [];
 
-  for (const c of wrongLanguage ? [] : raw.factsThisTurn ?? []) {
+  // A hint turn banks nothing — the learner asked how to say it; they still
+  // have to say it. Enforced here, not trusted to the model.
+  for (const c of wrongLanguage || hintRequested ? [] : raw.factsThisTurn ?? []) {
     const cn = norm(c);
     if (!cn) continue;
     const match = reqList.find((r) => {
@@ -311,6 +343,7 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
     // Wrong language is never "understood" and never a repair — it reads 🔴.
     meaningUnderstood: wrongLanguage ? false : raw.meaningUnderstood ?? false,
     repairNeeded: wrongLanguage ? false : raw.repairNeeded ?? false,
+    hintRequested,
     objectiveProgress,
     grammar: wrongLanguage ? 0 : raw.grammar ?? 0.5,
     vocabulary: wrongLanguage ? 0 : raw.vocabulary ?? 0.5,
@@ -330,7 +363,9 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
     objectiveProgress,
     complete,
     cefr: state.cefr,
+    understoodAs: raw.understoodAs?.trim() || null,
     naturalUpgrade: raw.naturalUpgrade ?? null,
+    upgradeWhy: raw.upgradeWhy?.trim() || null,
     factsCommunicated: [...soFar],
     wrongLanguage,
     askInstead:
@@ -346,6 +381,9 @@ export interface DebriefRequest {
   scene: Scene;
   /** Every learner utterance from the run, in order. */
   said: string[];
+  /** Per-utterance: what the character understood (aligned with `said`), so the
+   * debrief can reference each turn accurately instead of guessing. */
+  understood?: Array<string | null>;
   /** Client-held ledger state — grounds the advice in real evidence. */
   ledgerState?: LedgerState;
 }
@@ -373,8 +411,13 @@ export async function debrief(req: DebriefRequest): Promise<string> {
   const prompt = `You are a warm, specific ${lang} coach. The learner just completed this
 role-play objective: "${req.scene.objective.description}".
 
-Everything they said, in order:
-${req.said.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
+Everything they said, in order (with what the listener understood each to mean):
+${req.said
+  .map((s, i) => {
+    const meant = req.understood?.[i];
+    return `${i + 1}. "${s}"${meant ? ` — understood as: ${meant}` : ''}`;
+  })
+  .join('\n')}
 
 Evidence from their record — grammar points they got wrong this session: ${missed || 'none recorded'}.
 Points due for review: ${shaky || 'none'}.

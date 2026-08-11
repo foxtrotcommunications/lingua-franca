@@ -38,7 +38,7 @@ export interface TurnResponse {
   characterId: string;
   characterName: string;
   reply: string;
-  outcome: 'understood' | 'repaired' | 'failed' | 'hint';
+  outcome: 'understood' | 'repaired' | 'partial' | 'failed' | 'hint';
   objectiveProgress: number;
   complete: boolean;
   cefr: string;
@@ -138,6 +138,11 @@ Reply ONLY in ${lang}, in character, in 1-3 short sentences, at or below level $
 Judge the learner's message by whether it WORKS (achieves the goal), never by grammar.
 Broken-but-understandable succeeds — react to their intent. If you truly can't tell what
 they mean, ask ONE short clarifying question in ${lang} (a repair), never "incorrect", never English.
+NEVER INVENT THE SPECIFICS. If their message doesn't actually give you what you'd need to
+act — which room, which item, what time, what they actually want — do not guess it, do not
+fill it in from the situation, and do not act as if they had said it: ask them for exactly
+what is missing, in character. Acting on details they never gave you would credit them for
+communication that did not happen.
 The learner is here to accomplish: "${scene.objective.description}".
 ${taskState.credited.length ? `Already handled — do NOT ask about these again: ${taskState.credited.join('; ')}.` : ''}
 ${taskState.open.length ? `Still open with YOU (the learner must say these to you): ${taskState.open.join('; ')}.` : ''}
@@ -173,6 +178,8 @@ interface RawVerdict {
   wrongLanguage?: boolean;
   /** The learner asked, in the target language, how to say something. */
   hintRequested?: boolean;
+  /** The character caught the topic but lacks the specifics needed to act. */
+  clarificationNeeded?: boolean;
   /** One English sentence: what the character understood the learner wanted. */
   understoodAs?: string;
   /** Required facts conveyed in the latest message only (ownership is per-turn). */
@@ -218,6 +225,27 @@ language once the meaning landed: the repair marker, scores, and correction carr
 quality feedback. The grading bar governs how strictly you judge UNDERSTANDING at this
 level, not a second perfection gate on top of it.
 
+ACTIONABLE COMMUNICATION vs. TOPIC RECOGNITION — decide this BEFORE crediting anything.
+A required fact is conveyed only if ${addressed.name} now has enough specific information
+to ACT: to answer the question, carry out the request, or write it down. Recognizing the
+TOPIC is not enough. If ${addressed.name} would first have to ask for something missing or
+unclear — which room, which item, what time, what exactly the learner wants — then set
+"clarificationNeeded": true and credit NO fact that depends on the missing information.
+Compare:
+- "quels trains aujourd'hui ?" → they can answer right now → conveyed, clarification NOT needed.
+- "je préfère ma chambre climat à 60" → they can tell it concerns the air conditioning, but
+  not the room, the problem, or the request → NOT conveyed, "clarificationNeeded": true.
+Rough, broken language that still says WHAT the learner wants is a repair, not a
+clarification: repairNeeded true, facts credited. Fluent language that leaves out the
+specifics is still a clarification: no credit. Ask yourself literally "could
+${addressed.name} do the thing now, without asking anything?" — if no, clarificationNeeded.
+
+These two flags are DIFFERENT failures, so keep them apart. When the topic landed but the
+specifics did not, that is "meaningUnderstood": true WITH "clarificationNeeded": true —
+the character followed the subject, they just can't act yet. Reserve
+"meaningUnderstood": false for a message where ${addressed.name} cannot even tell what the
+learner is talking about.
+
 OPEN DECISION FACTS: a fact like "order the dessert you chose" is conveyed when the
 learner orders or states ANY option that has come up in the conversation — there is no
 single correct option.
@@ -225,7 +253,8 @@ Return ONE JSON object (no prose):
 {
  "communicativeIntent": "short label",
  "meaningUnderstood": true/false,   // would the character grasp THIS latest message?
- "repairNeeded": true/false,        // did the character have to clarify?
+ "repairNeeded": true/false,        // rough language, but the character could still act
+ "clarificationNeeded": true/false, // see ACTIONABLE COMMUNICATION below
  "hintRequested": true/false,       // see HELP REQUESTS below
  "understoodAs": "ONE plain-English sentence: what the character understood the learner
     wanted from this message, named after the character — e.g. \"${addressed.name}
@@ -337,6 +366,10 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   const wrongLanguage = raw.wrongLanguage === true;
   // Wrong-language wins over hint: asking for help in English is still English.
   const hintRequested = !wrongLanguage && raw.hintRequested === true;
+  // Topic recognized but not actionable: the character has to ask before doing
+  // anything, so nothing was actually communicated. Enforced here rather than
+  // trusted to the model, which will happily infer specifics never said.
+  const clarificationNeeded = !wrongLanguage && !hintRequested && raw.clarificationNeeded === true;
   // Ownership: in a multi-character scene each fact belongs to one character,
   // and only that character can be told/asked it. Enforced here rather than
   // trusted to the model — working out who holds what IS the puzzle.
@@ -351,8 +384,9 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   // Hint turns CAN bank facts: a message like "je voudrais une table...
   // comment dit-on 'outside'?" both attempts a task and asks for help, and the
   // attempt must not be swallowed by the help request. The ownership, language,
-  // and fact-matching gates below still bound what can credit.
-  for (const c of wrongLanguage ? [] : raw.factsThisTurn ?? []) {
+  // and fact-matching gates below still bound what can credit. A turn that left
+  // the character unable to act banks nothing.
+  for (const c of wrongLanguage || clarificationNeeded ? [] : raw.factsThisTurn ?? []) {
     const cn = norm(c);
     if (!cn) continue;
     const match = reqList.find((r) => {
@@ -377,6 +411,7 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
     meaningUnderstood: wrongLanguage ? false : raw.meaningUnderstood ?? false,
     repairNeeded: wrongLanguage ? false : raw.repairNeeded ?? false,
     hintRequested,
+    clarificationNeeded,
     objectiveProgress,
     grammar: wrongLanguage ? 0 : raw.grammar ?? 0.5,
     vocabulary: wrongLanguage ? 0 : raw.vocabulary ?? 0.5,

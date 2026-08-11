@@ -76,6 +76,22 @@ describe('Ledger — deterministic floor', () => {
     expect(cal.known).not.toContain('payment');
   });
 
+  it('a turn the character cannot act on is partial, not repaired', () => {
+    const ledger = new Ledger(new InMemoryLedgerStore());
+    // Topic recognized, specifics missing — communication did not succeed.
+    expect(ledger.outcome(verdict({ clarificationNeeded: true }))).toBe('partial');
+    // Rough language the character could still act on stays a passing repair.
+    expect(ledger.outcome(verdict({ repairNeeded: true }))).toBe('repaired');
+    // Not understood at all still outranks partial.
+    expect(ledger.outcome(verdict({ clarificationNeeded: true, meaningUnderstood: false }))).toBe(
+      'failed',
+    );
+    // And it must not count as comprehension.
+    let state = ledger.get('learner-p', 'es');
+    state = ledger.record(state, SCENE, verdict({ clarificationNeeded: true }));
+    expect(ledger.comprehensionRate(state)).toBeCloseTo(0);
+  });
+
   it('a hint request is its own outcome and does not move comprehension', () => {
     const ledger = new Ledger(new InMemoryLedgerStore());
     expect(ledger.outcome(verdict({ hintRequested: true }))).toBe('hint');

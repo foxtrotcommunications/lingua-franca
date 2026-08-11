@@ -11,11 +11,19 @@ export type GrammarPointId = string;
 export type VocabId = string;
 
 /**
- * Outcomes of a communicative attempt — richer than pass/fail. 'hint' is a
- * help request made in the target language ("comment je dis... ?"): a real
- * conversational skill, counted as neither success nor failure.
+ * Outcomes of a communicative attempt — richer than pass/fail.
+ *
+ * - 'understood' — landed cleanly; the character can act.
+ * - 'repaired'   — rough language, but the character worked out what to do and
+ *                  acted. Credits: communication succeeded.
+ * - 'partial'    — the character caught the TOPIC but not enough to act on, and
+ *                  had to ask for the missing specifics. Credits nothing:
+ *                  semantic recognition is not successful communication.
+ * - 'failed'     — did not land at all.
+ * - 'hint'       — a help request in the target language ("comment je dis...?"):
+ *                  a real conversational skill, neither success nor failure.
  */
-export type Outcome = 'understood' | 'repaired' | 'failed' | 'hint';
+export type Outcome = 'understood' | 'repaired' | 'partial' | 'failed' | 'hint';
 
 /**
  * The Coach's private evaluation of one learner utterance. Scores are 0..1.
@@ -28,6 +36,11 @@ export interface CoachVerdict {
   repairNeeded: boolean;
   /** The learner asked (in the target language) how to say something. */
   hintRequested?: boolean;
+  /**
+   * The character caught the topic but lacks the specifics needed to act, and
+   * had to ask. Nothing credits on such a turn.
+   */
+  clarificationNeeded?: boolean;
   objectiveProgress: number;
   grammar: number;
   vocabulary: number;

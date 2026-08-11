@@ -30,7 +30,8 @@ function saveLedger(language: string, state: LedgerBlob): void {
 
 const OUTCOME = {
   understood: { dot: '🟢', label: 'Understood' },
-  repaired: { dot: '🟡', label: 'Repaired' },
+  repaired: { dot: '🟡', label: 'Understood — rough' },
+  partial: { dot: '🟠', label: 'Not enough to act on' },
   failed: { dot: '🔴', label: 'Not yet' },
   hint: { dot: '💡', label: 'Asked for help' },
 } as const;
@@ -283,6 +284,11 @@ export function Play({
                 )}
                 {!t.wrongLanguage && !t.askInstead && t.outcome === 'repaired' && (
                   <span className="lang-nudge">Understood — worth polishing, see your debrief</span>
+                )}
+                {!t.wrongLanguage && !t.askInstead && t.outcome === 'partial' && (
+                  <span className="lang-nudge">
+                    Not enough to go on — answer what they’re asking
+                  </span>
                 )}
               </div>
             ) : (

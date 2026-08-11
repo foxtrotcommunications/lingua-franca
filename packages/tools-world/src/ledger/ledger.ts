@@ -99,9 +99,10 @@ export class Ledger {
     }
 
     // A hint request is neither understood nor failed — it must not move the
-    // comprehension rate in either direction.
+    // comprehension rate in either direction. A turn the character couldn't act
+    // on did not comprehend, whatever the coach thought of the topic.
     if (!verdict.hintRequested) {
-      next.comprehensionSamples.push(verdict.meaningUnderstood);
+      next.comprehensionSamples.push(verdict.meaningUnderstood && !verdict.clarificationNeeded);
       if (next.comprehensionSamples.length > COMPREHENSION_WINDOW) {
         next.comprehensionSamples.splice(0, next.comprehensionSamples.length - COMPREHENSION_WINDOW);
       }
@@ -122,10 +123,15 @@ export class Ledger {
     return s.filter(Boolean).length / s.length;
   }
 
-  /** Deterministic tier from the verdict alone. */
+  /**
+   * Deterministic tier from the verdict alone. 'partial' sits between failure
+   * and repair: the character understood the topic but could not act on it, so
+   * communication did not actually succeed.
+   */
   outcome(verdict: CoachVerdict): Outcome {
     if (verdict.hintRequested) return 'hint';
     if (!verdict.meaningUnderstood) return 'failed';
+    if (verdict.clarificationNeeded) return 'partial';
     return verdict.repairNeeded ? 'repaired' : 'understood';
   }
 

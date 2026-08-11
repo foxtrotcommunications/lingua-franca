@@ -44,10 +44,11 @@ version. Communication comes before perfection.
   how many people are in the scene, how strictly your language is graded, and
   how polished the corrections you get back are. At B2 and above the objectives
   themselves are written in the language you're practicing.
-- **Four outcomes per turn.** 🟢 understood · 🟡 repaired (you were
-  misunderstood, then clarified — a real skill) · 💡 you asked for help in the
-  target language (also a real skill) · 🔴 not yet. Understanding decides
-  progress; the corrections carry the polish.
+- **Five outcomes per turn.** 🟢 understood · 🟡 rough but they could act on it
+  · 🟠 they caught the topic but not enough to act, and had to ask · 💡 you
+  asked for help in the target language (a real skill) · 🔴 not yet. Only turns
+  a character could actually *act* on move the objective; the corrections carry
+  the polish.
 - **A private coach.** Never speaks in-scene. Scores every utterance, and at the
   end walks you back through the whole conversation with a natural-language
   upgrade for each line, then tells you what to study next — quoting what you

@@ -41,7 +41,7 @@ export interface TurnResponse {
   characterId: string;
   characterName: string;
   reply: string;
-  outcome: 'understood' | 'repaired' | 'failed' | 'hint';
+  outcome: 'understood' | 'repaired' | 'partial' | 'failed' | 'hint';
   objectiveProgress: number;
   complete: boolean;
   cefr: string;

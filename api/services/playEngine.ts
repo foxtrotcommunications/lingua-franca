@@ -380,6 +380,8 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   };
   /** Facts said to the wrong person this turn — surfaced so the UI can redirect. */
   const misdirected: Array<{ fact: string; owner: string }> = [];
+  /** Facts that actually banked this turn — i.e. whether the learner moved forward. */
+  let creditedThisTurn = 0;
 
   // Hint turns CAN bank facts: a message like "je voudrais une table...
   // comment dit-on 'outside'?" both attempts a task and asks for help, and the
@@ -399,6 +401,7 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
     // No owner recorded, or a one-character scene: nobody else to ask.
     if (soloCast || !owner || owner === character.characterId) {
       soFar.add(match);
+      creditedThisTurn += 1;
     } else {
       misdirected.push({ fact: match, owner });
     }
@@ -423,11 +426,22 @@ export async function playTurn(req: TurnRequest): Promise<TurnResponse> {
   const state = ledger.record(state0, req.scene.id, verdict);
   const complete = objectiveProgress >= 1;
 
+  // The outcome marker answers one question: did this turn move you forward?
+  // Saying the right thing to the wrong person doesn't, so it reads 🟠 like any
+  // other no-progress turn — with its own redirect nudge in the UI. (The ledger
+  // still records it as comprehended: the character understood fine, they were
+  // simply not the one who could act on it.)
+  const base = ledger.outcome(verdict);
+  const outcome =
+    (base === 'understood' || base === 'repaired') && creditedThisTurn === 0 && misdirected.length > 0
+      ? 'partial'
+      : base;
+
   return {
     characterId: character.characterId,
     characterName: character.name,
     reply,
-    outcome: ledger.outcome(verdict),
+    outcome,
     objectiveProgress,
     complete,
     cefr: state.cefr,

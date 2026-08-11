@@ -16,6 +16,15 @@ import { playTurn, debrief, type TurnRequest, type DebriefRequest } from './serv
 const app = express();
 app.use(express.json({ limit: '12mb' }));
 
+/**
+ * Structured usage event → stdout → Cloud Logging. Dimensions only — never
+ * learner text and never learner ids: the product's privacy stance is that the
+ * server retains nothing per learner, and analytics follow the same rule.
+ */
+function track(evt: string, fields: Record<string, unknown>): void {
+  console.log(JSON.stringify({ evt, ...fields }));
+}
+
 const wrap =
   (fn: (req: express.Request, res: express.Response) => Promise<void>) =>
   (req: express.Request, res: express.Response) => {
@@ -43,7 +52,9 @@ app.post(
       detail?: string;
       reference?: string;
     };
-    res.json({ dataUrl: await generateImage(scenePrompt(location, detail ?? ''), reference) });
+    const dataUrl = await generateImage(scenePrompt(location, detail ?? ''), reference);
+    track('image_generated', { kind: 'scene' });
+    res.json({ dataUrl });
   }),
 );
 
@@ -55,7 +66,9 @@ app.post(
       persona: string;
       reference?: string;
     };
-    res.json({ dataUrl: await generateImage(characterPrompt(name, persona), reference) });
+    const dataUrl = await generateImage(characterPrompt(name, persona), reference);
+    track('image_generated', { kind: 'character' });
+    res.json({ dataUrl });
   }),
 );
 
@@ -66,21 +79,44 @@ app.post(
       description: string;
       difficulty?: number;
     };
-    res.json({ scene: await generateScenario(description, difficulty) });
+    const scene = await generateScenario(description, difficulty);
+    track('scenario_generated', {
+      language: scene.language,
+      difficulty: scene.difficulty,
+      cast: scene.characters.length,
+      facts: scene.objective.requiredFacts.length,
+    });
+    res.json({ scene });
   }),
 );
 
 app.post(
   '/api/play/turn',
   wrap(async (req, res) => {
-    res.json(await playTurn(req.body as TurnRequest));
+    const body = req.body as TurnRequest;
+    const r = await playTurn(body);
+    track('turn', {
+      language: body.scene.language,
+      difficulty: body.scene.difficulty,
+      outcome: r.outcome,
+      wrongLanguage: r.wrongLanguage,
+      progress: Math.round(r.objectiveProgress * 100) / 100,
+      complete: r.complete,
+    });
+    res.json(r);
   }),
 );
 
 app.post(
   '/api/play/debrief',
   wrap(async (req, res) => {
-    const note = await debrief(req.body as DebriefRequest);
+    const body = req.body as DebriefRequest;
+    const note = await debrief(body);
+    track('debrief', {
+      language: body.scene.language,
+      difficulty: body.scene.difficulty,
+      turns: body.said.length,
+    });
     // `note` is the legacy single-paragraph field: clients cached from before
     // the right/improve split read it, so a deploy can't strand them on a
     // spinner. Remove once index.html no-cache has been live a while.

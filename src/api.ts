@@ -35,6 +35,7 @@ export const api = {
     scene: Scene,
     said: string[],
     understood: Array<string | null>,
+    upgrades: Array<string | null>,
     ledgerState?: LedgerBlob,
   ) =>
     post<{ right: string; improve: string }>('/api/play/debrief', {
@@ -42,6 +43,7 @@ export const api = {
       scene,
       said,
       understood,
+      upgrades,
       ledgerState,
     }),
 };

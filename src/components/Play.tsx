@@ -167,9 +167,10 @@ export function Play({
       if (r.complete) {
         setDone(r);
         // Closing coach note — generated from everything they said this run,
-        // grounded in the ledger they just accumulated.
+        // grounded in the ledger and the corrections already shown.
+        const upgrades = [...review.map((v) => v.upgrade), r.naturalUpgrade];
         api
-          .debrief(learnerId, scene, said, understood, ledgerRef.current)
+          .debrief(learnerId, scene, said, understood, upgrades, ledgerRef.current)
           .then(setCoachNote)
           .catch(() => setCoachFailed(true));
       }
@@ -352,6 +353,18 @@ export function Play({
             {review.length > 0 && (
               <div className="cc-review">
                 <div className="cc-review-title">Your communication</div>
+                {(() => {
+                  const n = review.filter(
+                    (r) =>
+                      r.upgrade && r.upgrade.trim().toLowerCase() !== r.said.trim().toLowerCase(),
+                  ).length;
+                  return n > 0 ? (
+                    <div className="cc-review-sub">
+                      Your {scene.language} worked — {n} small upgrade{n === 1 ? '' : 's'} for
+                      next time.
+                    </div>
+                  ) : null;
+                })()}
                 {review.map((r, i) => {
                   const upgraded =
                     r.upgrade && r.upgrade.trim().toLowerCase() !== r.said.trim().toLowerCase();

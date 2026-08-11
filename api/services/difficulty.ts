@@ -13,6 +13,12 @@ export interface DifficultySpec {
   genGuidance: string;
   /** Coach grading bar: how strictly to credit a communicated fact. */
   gradeGuidance: string;
+  /**
+   * Correction bar: how sophisticated the naturalUpgrade and its explanation
+   * may be. Feedback is i+1 like everything else — the grading bar and the
+   * character's speech are tier-gated, and so is what we teach back.
+   */
+  feedbackGuidance: string;
 }
 
 export const DIFFICULTY: Record<number, DifficultySpec> = {
@@ -26,6 +32,12 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
     gradeGuidance:
       'Pass on meaning alone. IGNORE grammar completely. Credit a required fact if the ' +
       'intent is even loosely clear (single words are fine).',
+    feedbackGuidance:
+      'Corrections must be the SIMPLEST natural phrase a beginner could retain — short, ' +
+      'everyday spoken register (prefer "C\'est combien ?" over "Quel est le prix ?", ' +
+      '"Comment on dit...?" over formal inversion). Give ONE confident correction, never ' +
+      'alternatives. The explanation is ONE short sentence about the single most useful ' +
+      'pattern — no grammar terminology beyond what a beginner needs.',
   },
   2: {
     level: 2,
@@ -37,6 +49,10 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
     gradeGuidance:
       'Credit a required fact whenever the message is understandable. Imperfect grammar is ' +
       'fine — a valid attempt that conveys the intent passes.',
+    feedbackGuidance:
+      'Corrections must be the simplest natural phrase for the situation, in everyday spoken ' +
+      'register. ONE confident correction, never alternatives. Explanation: 1 short sentence ' +
+      'on the one pattern that matters most.',
   },
   3: {
     level: 3,
@@ -48,6 +64,9 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
     gradeGuidance:
       'Credit a required fact only if conveyed in a reasonably well-formed sentence (minor ' +
       'grammar slips are ok, but not broken word-salad).',
+    feedbackGuidance:
+      'Corrections should be natural phrasing within reach of an intermediate learner — no ' +
+      'advanced constructions. One pattern per correction, explanation 1-2 sentences.',
   },
   4: {
     level: 4,
@@ -59,6 +78,9 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
     gradeGuidance:
       'Be strict. Credit a required fact only if conveyed with correct grammar AND natural ' +
       'phrasing. Broken or awkward grammar does NOT pass at this level.',
+    feedbackGuidance:
+      'Corrections at fully natural native phrasing; explanations may name register and ' +
+      'nuance in 1-2 sentences.',
   },
   5: {
     level: 5,
@@ -71,6 +93,9 @@ export const DIFFICULTY: Record<number, DifficultySpec> = {
     gradeGuidance:
       'Hold a high bar. Credit a required fact only if conveyed with near-native accuracy, ' +
       'appropriate register, and well-developed language — not just a bare minimal phrase.',
+    feedbackGuidance:
+      'Corrections at native polish, including register and idiom; detailed explanations ' +
+      'are appropriate at this level.',
   },
 };
 

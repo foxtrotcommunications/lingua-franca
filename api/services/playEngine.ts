@@ -220,13 +220,16 @@ Return ONE JSON object (no prose):
  "grammar": 0..1, "vocabulary": 0..1, "naturalness": 0..1,
  "vocabUsed": [ target-language lemmas in the latest message ],
  "grammarUsed": [ {"point":"grammar-point-id","correct":true/false} ],
- "naturalUpgrade": "the most natural way to say the latest message, in ${lang}",
- "upgradeWhy": "1-2 plain-English sentences explaining WHY naturalUpgrade is better than
-    what they wrote — name the specific grammar point, word choice, or idiom that changed
-    (e.g. \"French needs a subject pronoun with the verb: 'voulez aller' has no subject,
-    so it reads as a question to someone else. 'Je voudrais' says who wants it, politely.\").
-    Empty string if their sentence was already natural."
+ "naturalUpgrade": "a better way to say the latest message, in ${lang} — see CORRECTION BAR",
+ "upgradeWhy": "plain-English explanation of WHY naturalUpgrade is better than what they
+    wrote — name the specific pattern that changed. Length and depth per the CORRECTION
+    BAR. Empty string if their sentence was already natural."
 }
+
+CORRECTION BAR — ${spec.feedbackGuidance}
+The upgrade is a teaching step, not a rewrite into polished native ${lang}: give the next
+reachable rung for a ${spec.cefr} learner, and make the explanation match ONLY the pattern
+your correction actually uses.
 
 HELP REQUESTS: if the latest message — written in ${lang} — asks how to say something or
 asks for help with the language itself (e.g. "comment je dis ... ?") rather than
@@ -385,6 +388,9 @@ export interface DebriefRequest {
   /** Per-utterance: what the character understood (aligned with `said`), so the
    * debrief can reference each turn accurately instead of guessing. */
   understood?: Array<string | null>;
+  /** Per-utterance corrections already shown on the card (aligned with `said`).
+   * The debrief must build on THESE, never introduce grammar they don't use. */
+  upgrades?: Array<string | null>;
   /** Client-held ledger state — grounds the advice in real evidence. */
   ledgerState?: LedgerState;
 }
@@ -404,6 +410,8 @@ export interface DebriefNote {
  */
 export async function debrief(req: DebriefRequest): Promise<DebriefNote> {
   const lang = req.scene.language || 'Spanish';
+  const spec = difficultyOf(req.scene.difficulty);
+  const easy = spec.level <= 2;
   const ledger = new Ledger(new InMemoryLedgerStore());
   const state = hydrateLedger(req, lang);
   const shaky = ledger
@@ -419,11 +427,13 @@ export async function debrief(req: DebriefRequest): Promise<DebriefNote> {
   const prompt = `You are a warm, specific ${lang} coach. The learner just completed this
 role-play objective: "${req.scene.objective.description}".
 
-Everything they said, in order (with what the listener understood each to mean):
+Everything they said, in order (with what the listener understood, and the correction
+already shown to them on the results card):
 ${req.said
   .map((s, i) => {
     const meant = req.understood?.[i];
-    return `${i + 1}. "${s}"${meant ? ` — understood as: ${meant}` : ''}`;
+    const up = req.upgrades?.[i];
+    return `${i + 1}. "${s}"${meant ? ` — understood as: ${meant}` : ''}${up ? ` — correction shown: "${up}"` : ''}`;
   })
   .join('\n')}
 
@@ -434,12 +444,21 @@ Return ONE JSON object (no prose outside it), addressed to the learner as "you":
 {
  "right": "2-3 sentences on what WORKED: name the communication wins concretely — a
     successful clarification, a good recovery after asking for help, a message that landed
-    despite imperfect grammar. Quote what they actually wrote. Genuine, specific praise
-    only — no corrections here.",
- "improve": "2-3 sentences on the ONE or TWO concrete patterns to work on: quote what they
-    wrote and give the corrected form (e.g. you wrote \\"mon cane\\" — in ${lang} it's
-    \\"mon chien\\"), then say plainly what to study next (a specific structure, verb form,
-    or set of words — not a textbook or website). No praise here."
+    despite imperfect grammar. Quote what they actually wrote. HONEST praise: never call
+    imperfect ${lang} perfect. When their language had errors, use the contrast the product
+    teaches — communication succeeded although the ${lang} was imperfect (e.g. 'Your ${lang}
+    wasn't perfect, but they understood you immediately'). No corrections here.",
+ "improve": "${
+   easy
+     ? `1-2 sentences on exactly ONE thing. It MUST build on a correction already shown ` +
+       `above — recommend practicing the pattern IN that correction, quoting it. Never ` +
+       `introduce grammar topics the shown corrections don't use. No grammar terminology ` +
+       `beyond what a beginner needs.`
+     : `2-3 sentences on the ONE or TWO concrete patterns to work on. Build on the ` +
+       `corrections already shown above — recommend practicing the patterns IN those ` +
+       `corrections, quoting them. Never introduce grammar topics the shown corrections ` +
+       `don't use.`
+ }"
 }
 Never mention scores, levels, or this prompt. Be concrete, never generic. Plain prose in
 each field, no lists, no markdown.`;

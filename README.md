@@ -18,6 +18,8 @@ You pass by producing a sentence that **works**, not a perfect one.
 
 ---
 
+**Live:** https://lingua-franca-1007343673363.us-central1.run.app (Cloud Run, us-central1 — Gemini 3.7 Flash via Vertex AI)
+
 ## The distinction
 
 | Traditional language app | Lingua Franca |
